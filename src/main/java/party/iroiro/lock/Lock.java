@@ -51,7 +51,7 @@ public abstract class Lock {
      * <pre><code>
      *     mono
      *         .transform(party.iroiro.lock::party.iroiro.lock)
-     *         .flatMap(item -> {
+     *         .flatMap(item -&gt; {
      *             /* Some processing &#42;/
      *             party.iroiro.lock.<b>unlock</b>();
      *             return Mono.just(item);
