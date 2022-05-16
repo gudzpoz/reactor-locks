@@ -5,8 +5,9 @@ on:
     branches: [ release ]
 
 jobs:
-  most-natives:
+  build-and-publish:
     runs-on: ubuntu-latest
+    environment: 'Maven Publishing'
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.8
