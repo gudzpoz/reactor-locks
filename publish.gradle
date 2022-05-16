@@ -33,6 +33,7 @@ publishing {
                         id = 'gudzpoz'
                         name = 'Kana Kana'
                         email = 'gudzpoz@live.com'
+                        url = 'https://github.com/gudzpoz'
                     }
                 }
             }
@@ -44,16 +45,18 @@ publishing {
             name = 'GitHub'
             url = 'https://maven.pkg.github.com/gudzpoz/reactor-locks'
             credentials {
-                username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR")
-                password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+                username = project.findProperty('gpr.user') ?: System.getenv('GITHUB_ACTOR')
+                password = project.findProperty('gpr.key') ?: System.getenv('GITHUB_TOKEN')
             }
         }
         maven {
-            name = "OSSRH"
-            url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+            name = 'OSSRH'
+            url = version.toString().endsWith('-SNAPSHOT')
+                    ? 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+                    : 'https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/'
             credentials {
-                username = System.getenv("MAVEN_USERNAME")
-                password = System.getenv("MAVEN_PASSWORD")
+                username = System.getenv('MAVEN_USERNAME')
+                password = System.getenv('MAVEN_PASSWORD')
             }
         }
     }
@@ -61,9 +64,9 @@ publishing {
 
 signing {
     useInMemoryPgpKeys(
-            System.getenv("GPG_KEY_ID"),
-            System.getenv("GPG_SECKEY"),
-            System.getenv("GPG_PASSPHRASE"),
+            System.getenv('GPG_KEY_ID'),
+            System.getenv('GPG_SECKEY'),
+            System.getenv('GPG_PASSPHRASE'),
     )
     sign publishing.publications.mavenJava
 }
