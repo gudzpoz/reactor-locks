@@ -1,5 +1,8 @@
 plugins {
     id 'java'
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
 }
 
 group 'party.iroiro'
@@ -18,3 +21,10 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+apply from: 'publish.gradle'

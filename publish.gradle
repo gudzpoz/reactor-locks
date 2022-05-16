@@ -1,0 +1,69 @@
+//file:noinspection GroovyAssignabilityCheck
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = group
+            artifactId = rootProject.name
+            version = version
+
+            from components.java
+
+            pom {
+                name = 'Reactor Locks'
+                description = 'Some reactive locks for Project Reactor'
+                url = 'https://github.com/gudzpoz/reactor-locks'
+                packaging = 'jar'
+
+                scm {
+                    connection = 'scm:git:git://github.com/gudzpoz/reactor-locks.git'
+                    developerConnection = 'scm:git:ssh://github.com:gudzpoz/reactor-locks.git'
+                    url = 'https://github.com/gudzpoz/reactor-locks/tree/main'
+                }
+
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = 'gudzpoz'
+                        name = 'Kana Kana'
+                        email = 'gudzpoz@live.com'
+                    }
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = 'GitHub'
+            url = 'https://maven.pkg.github.com/gudzpoz/reactor-locks'
+            credentials {
+                username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_ACTOR")
+                password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+        maven {
+            name = "OSSRH"
+            url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+            credentials {
+                username = System.getenv("MAVEN_USERNAME")
+                password = System.getenv("MAVEN_PASSWORD")
+            }
+        }
+    }
+}
+
+signing {
+    useInMemoryPgpKeys(
+            System.getenv("GPG_KEY_ID"),
+            System.getenv("GPG_SECKEY"),
+            System.getenv("GPG_PASSPHRASE"),
+    )
+    sign publishing.publications.mavenJava
+}
