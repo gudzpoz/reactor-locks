@@ -2,7 +2,7 @@ name: Build and Publish
 
 on:
   workflow_dispatch:
-    branches: [ main ]
+    branches: [ release ]
 
 jobs:
   most-natives:
