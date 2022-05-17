@@ -18,26 +18,33 @@ package party.iroiro.lock;
 
 import reactor.core.publisher.Mono;
 
+import java.util.function.Consumer;
+
 /**
  * A reactive interface for simple locks (and probably semaphores)
  */
 public abstract class Lock {
     /**
+     * Try to acquire the lock on the next element before propagating
+     *
+     * <p>
      * Usage:
+     * </p>
      * <pre><code>
+     *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(party.iroiro.lock::<b>party.iroiro.lock</b>)
+     *         .transform(lock::<b>lock</b>)
      *         /* Some processing &#42;/
-     *         .transform(party.iroiro.lock::unlock)
+     *         .transform(lock::unlock)
      *         .block();
      * </code></pre>
      *
      * <p>
      * The underlying implementation should automatically queue the {@link Mono} up
-     * if the party.iroiro.lock is not available.
+     * if the lock is not available.
      * </p>
      * <p>
-     * When the party.iroiro.lock becomes available, the value will be automatically propagated downstream.
+     * When the lock becomes available, the value will be automatically propagated downstream.
      * </p>
      *
      * @param mono the {@link Mono}, of which the next value will require locking to propagate
@@ -47,13 +54,18 @@ public abstract class Lock {
     public abstract <T> Mono<T> lock(Mono<T> mono);
 
     /**
-     * Unlocks. Usage:
+     * Unlocks
+     *
+     * <p>
+     * Usage:
+     * </p>
      * <pre><code>
+     *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(party.iroiro.lock::party.iroiro.lock)
+     *         .transform(lock::lock)
      *         .flatMap(item -&gt; {
      *             /* Some processing &#42;/
-     *             party.iroiro.lock.<b>unlock</b>();
+     *             lock.<b>unlock</b>();
      *             return Mono.just(item);
      *         })
      *         .block();
@@ -62,17 +74,22 @@ public abstract class Lock {
     public abstract void unlock();
 
     /**
+     * Release the lock with {@link Mono#doOnTerminate(Runnable)} before propagating
+     *
+     * <p>
      * Usage:
+     * </p>
      * <pre><code>
+     *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(party.iroiro.lock::party.iroiro.lock)
+     *         .transform(lock::lock)
      *         /* Some processing &#42;/
-     *         .transform(party.iroiro.lock::<b>unlockOnTerminate</b>)
+     *         .transform(lock::<b>unlockOnTerminate</b>)
      *         .block();
      * </code></pre>
      *
      * <p>
-     * Using {@link Mono#doOnTerminate} to ensure the execution order and handling of
+     * Using {@link Mono#doOnTerminate(Runnable)} to ensure the execution order and handling of
      * all cases, including an empty {@link Mono}, a successful {@link Mono} with a
      * emitted value or {@link Mono}s with an error.
      * </p>
@@ -86,19 +103,23 @@ public abstract class Lock {
     }
 
     /**
+     * Release the lock with {@link Mono#doOnNext(Consumer)} before propagating
+     *
+     * <p>
      * Usage:
+     * </p>
      * <pre><code>
+     *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(party.iroiro.lock::party.iroiro.lock)
+     *         .transform(lock::lock)
      *         /* Some processing &#42;/
-     *         .transform(party.iroiro.lock::<b>unlockOnNext</b>)
+     *         .transform(lock::<b>unlockOnNext</b>)
      *         .block();
      * </code></pre>
      *
      * <p>
-     * Using {@link Mono#doOnNext} to ensure the execution order and handling of
-     * all cases, including an empty {@link Mono}, a successful {@link Mono} with a
-     * emitted value or {@link Mono}s with an error.
+     * Using {@link Mono#doOnNext(Consumer)} to ensure the execution order and handling of
+     * a successful {@link Mono} with a emitted value.
      * </p>
      *
      * @param mono the {@link Mono}, of which the next value will require unlocking to propagate
@@ -110,19 +131,23 @@ public abstract class Lock {
     }
 
     /**
+     * Release the lock with {@link Mono#switchIfEmpty(Mono)}
+     *
+     * <p>
      * Usage:
+     * </p>
      * <pre><code>
+     *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(party.iroiro.lock::party.iroiro.lock)
+     *         .transform(lock::lock)
      *         /* Some processing &#42;/
-     *         .transform(party.iroiro.lock::<b>unlockOnEmpty</b>)
+     *         .transform(lock::<b>unlockOnEmpty</b>)
      *         .block();
      * </code></pre>
      *
      * <p>
-     * Using {@link Mono#doOnNext} to ensure the execution order and handling of
-     * all cases, including an empty {@link Mono}, a successful {@link Mono} with a
-     * emitted value or {@link Mono}s with an error.
+     * Using {@link Mono#switchIfEmpty(Mono)} to ensure the execution order and handling of
+     * an empty {@link Mono}.
      * </p>
      *
      * @param mono the {@link Mono}, of which the signal, when Mono is empty, will require unlocking to propagate
@@ -137,19 +162,23 @@ public abstract class Lock {
     }
 
     /**
+     * Release the lock with {@link Mono#doOnError(Consumer)} before propagating
+     *
+     * <p>
      * Usage:
+     * </p>
      * <pre><code>
+     *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(party.iroiro.lock::party.iroiro.lock)
+     *         .transform(lock::lock)
      *         /* Some processing &#42;/
-     *         .transform(party.iroiro.lock::<b>unlockOnError</b>)
+     *         .transform(lock::<b>unlockOnError</b>)
      *         .block();
      * </code></pre>
      *
      * <p>
-     * Using {@link Mono#doOnNext} to ensure the execution order and handling of
-     * all cases, including an empty {@link Mono}, a successful {@link Mono} with a
-     * emitted value or {@link Mono}s with an error.
+     * Using {@link Mono#doOnError(Consumer)} to ensure the execution order and handling of
+     * {@link Mono}s with an error.
      * </p>
      *
      * @param mono the {@link Mono}, of which the next error will require unlocking to propagate

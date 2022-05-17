@@ -25,14 +25,11 @@ import reactor.core.publisher.Mono;
 public abstract class RWLock extends Lock {
 
     /**
-     * See {@link Lock#lock} for details.
+     * See {@link Lock#lock(Mono)} for details.
      *
      * <p>
      * The difference is that the underlying implementation might choose to implement a
-     * <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">Readers–writer party.iroiro.lock</a>.
-     * </p>
-     * <p>
-     * The default implementation simply calls {@link Lock#lock}.
+     * <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">Readers–writer lock</a>.
      * </p>
      *
      * @param mono the {@link Mono}, of which the next value will require locking to propagate
@@ -47,7 +44,7 @@ public abstract class RWLock extends Lock {
     public abstract void rUnlock();
 
     /**
-     * See {@link Lock#unlockOnEmpty} for details.
+     * See {@link Lock#unlockOnEmpty(Mono)} for details.
      *
      * @param mono the {@link Mono}, of which the next signal, when Mono is empty, will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
@@ -61,7 +58,7 @@ public abstract class RWLock extends Lock {
     }
 
     /**
-     * See {@link Lock#unlockOnNext} for details.
+     * See {@link Lock#unlockOnNext(Mono)} for details.
      *
      * @param mono the {@link Mono}, of which the next value will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
@@ -72,7 +69,7 @@ public abstract class RWLock extends Lock {
     }
 
     /**
-     * See {@link Lock#unlockOnTerminate} for details.
+     * See {@link Lock#unlockOnTerminate(Mono)} for details.
      *
      * @param mono the {@link Mono}, of which the termination signal will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
@@ -83,7 +80,7 @@ public abstract class RWLock extends Lock {
     }
 
     /**
-     * See {@link Lock#unlockOnError} for details.
+     * See {@link Lock#unlockOnError(Mono)} for details.
      *
      * @param mono the {@link Mono}, of which the next error will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
