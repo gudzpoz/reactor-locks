@@ -56,7 +56,7 @@ public class ReactiveRWLock extends RWLock {
 
     public synchronized void unlock() {
         if (SinkUtils.emitAndCheckShouldUnlock(writers)) {
-            if (readerCount == 0) {
+            if (readers.isEmpty() && readerCount == 0) {
                 state = State.NONE;
             } else {
                 startReaders();
@@ -67,31 +67,38 @@ public class ReactiveRWLock extends RWLock {
     private void startReaders() {
         state = State.READING;
         Sinks.Empty<Void> reader = readers.poll();
-        boolean someSuccess = false;
         while (reader != null) {
             if (reader.tryEmitEmpty().isSuccess()) {
-                someSuccess = true;
+                readerCount++;
             }
             reader = readers.poll();
         }
-        if (!someSuccess) {
+        if (readerCount == 0) {
             state = State.NONE;
         }
     }
 
     @Override
     public synchronized Mono<Void> rLock() {
-        readerCount++;
         switch (state) {
             case NONE:
                 state = State.READING;
-                /* Fall through */
-            case READING:
+                readerCount++;
                 return Mono.empty();
+            case READING:
+                if (writers.isEmpty()) {
+                    readerCount++;
+                    return Mono.empty();
+                }
+                /* Fall through */
             case WRITING:
                 return SinkUtils.queue(readers, empty -> {
-                    empty.tryEmitEmpty();
-                    rUnlock();
+                    synchronized (this) {
+                        if (empty.tryEmitEmpty().isSuccess()) {
+                            readerCount++;
+                        }
+                        rUnlock();
+                    }
                 });
             default:
                 return Mono.never();
@@ -104,7 +111,7 @@ public class ReactiveRWLock extends RWLock {
         if (readerCount == 0 && state != State.WRITING) {
             state = State.WRITING;
             if (SinkUtils.emitAndCheckShouldUnlock(writers)) {
-                state = State.NONE;
+                startReaders();
             }
         }
     }

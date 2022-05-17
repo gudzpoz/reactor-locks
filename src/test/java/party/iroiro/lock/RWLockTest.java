@@ -17,7 +17,9 @@
 package party.iroiro.lock;
 
 import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.Test;
 import org.junit.platform.commons.annotation.Testable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -35,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Testable
 public class RWLockTest {
-    @RepeatedTest(value = 3000)
+    @RepeatedTest(value = 20000)
     public void rwLockTest() {
         rwLockTest(2, 0, null);
         rwLockTest(2, 1, null);
@@ -49,8 +51,28 @@ public class RWLockTest {
         rwLockTest(500, 1, Schedulers.parallel());
     }
 
+    @Test
+    public void hungerTest() {
+        ReactiveRWLock rw = new ReactiveRWLock();
+        Mono<Void> firstReader = rw.rLock();
+        Mono<Void> thenWriter = rw.lock();
+        Mono<Void> blockedReader = rw.rLock();
+        Mono<Void> blockedReader2 = rw.rLock();
+        Flux.merge(
+                firstReader.thenReturn(0).delayElement(Duration.ofSeconds(5))
+                        .doOnTerminate(rw::rUnlock),
+                Mono.just(1).delayElement(Duration.ofSeconds(1)).then(thenWriter)
+                        .doOnTerminate(rw::unlock),
+                Mono.just(2).delayElement(Duration.ofSeconds(2)).then(blockedReader)
+                        .doOnTerminate(rw::rUnlock),
+                Mono.just(3).delayElement(Duration.ofSeconds(3)).then(blockedReader2)
+                        .doOnTerminate(rw::rUnlock)
+        ).blockLast();
+    }
+
     private void rwLockTest(int count, int delay, Scheduler scheduler) {
-        Helper helper = new Helper(new ReactiveRWLock(), count,
+        ReactiveRWLock rw = new ReactiveRWLock();
+        Helper helper = new Helper(rw, count,
                 () -> Duration.of(delay, ChronoUnit.MICROS), scheduler);
         helper.verify().block();
     }
