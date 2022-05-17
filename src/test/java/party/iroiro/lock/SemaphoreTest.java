@@ -17,80 +17,97 @@
 package party.iroiro.lock;
 
 import org.junit.jupiter.api.RepeatedTest;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
-import java.util.ArrayList;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 public class SemaphoreTest {
-    @RepeatedTest(value = 1000)
+    @RepeatedTest(value = 5000)
     public void semaphoreTest() {
-        semaphoreTest(2, 1, 0, false);
-        semaphoreTest(2, 1, 1, false);
-        semaphoreTest(10, 5, 0, true);
-        semaphoreTest(100, 5, 1, true);
+        semaphoreTest(2, 1, 0, null);
+        semaphoreTest(2, 1, 1, null);
+        semaphoreTest(10, 5, 0, Schedulers.parallel());
+        semaphoreTest(100, 5, 1, Schedulers.parallel());
     }
 
-    private void semaphoreTest(int count, int limit, int delay, boolean scheduler) {
-        Lock lock = new ReactiveSemaphore(limit);
-        ArrayList<Mono<Integer>> monoCollection = new ArrayList<>(count);
-        long totalDelay = 0;
-        Scheduler elastic = Schedulers.boundedElastic();
-        Scheduler parallel = Schedulers.parallel();
-        AtomicInteger readers = new AtomicInteger(0);
-        AtomicInteger max = new AtomicInteger(0);
-        for (int i = 0; i < count; i++) {
-            totalDelay += delay;
-            monoCollection.add(
-                    (scheduler ?
-                            Mono.just(i)
-                                    .publishOn((i & 1) == 0 ? elastic : parallel)
-                            :
-                            Mono.just(i))
+    private void semaphoreTest(int count, int limit, int delay, Scheduler scheduler) {
+        Helper helper = new Helper(new ReactiveSemaphore(limit), count, () ->
+                Duration.of(delay, ChronoUnit.MICROS), limit, scheduler);
+        helper.verify().block();
+    }
 
-                            .transform(lock::lock)
-                            .flatMap(ii -> {
-                                int now = readers.incrementAndGet();
-                                if (now > count) {
-                                    return Mono.error(new IllegalStateException("Max already"));
-                                } else {
-                                    max.updateAndGet(m -> Math.max(now, m));
-                                    return Mono.just(ii);
-                                }
-                            })
-                            .delayElement(Duration.ofMillis(delay))
-                            .flatMap(ii -> {
-                                if (readers.decrementAndGet() >= 0) {
-                                    if (ii % 10 == 8) {
-                                        return Mono.error(new SomeException(ii));
-                                    } else {
-                                        return Mono.just(ii);
-                                    }
-                                } else {
-                                    return Mono.error(new IllegalStateException("Really unexpected"));
-                                }
-                            })
-                            .transform(lock::unlockOnTerminate)
-                            .onErrorResume(SomeException.class, e -> Mono.just(e.getI())));
+    static class Helper extends LockTestHelper<Lock> {
+        final Set<Integer> set;
+        final AtomicInteger readers;
+        private final int limit;
+        private final Scheduler scheduler;
+
+        Helper(Lock lock, int concurrency, Supplier<Duration> delay, int limit, Scheduler scheduler) {
+            super(lock, concurrency, delay);
+            this.limit = limit;
+            this.scheduler = scheduler;
+            set = new ConcurrentSkipListSet<>();
+            readers = new AtomicInteger(0);
         }
-        Set<Integer> set = new ConcurrentSkipListSet<>();
-        long start = System.nanoTime();
-        assertDoesNotThrow(() -> Flux.merge(monoCollection).doOnNext(
-                set::add
-        ).blockLast());
-        long end = System.nanoTime();
-        assertEquals(count, set.size());
-        assertTrue(scheduler || totalDelay * 1000_000 <= end - start);
-        assertEquals(0, readers.get());
+
+        @Override
+        protected void verifyFinally() {
+            assertEquals(concurrency, set.size());
+        }
+
+        @Override
+        Mono<Integer> schedule(Mono<Integer> integerMono) {
+            if (scheduler == null) {
+                return integerMono;
+            } else {
+                return integerMono.publishOn(scheduler);
+            }
+        }
+
+        @Override
+        Mono<Integer> lock(Mono<Integer> integerMono) {
+            return integerMono.transform(lock::lockOnNext);
+        }
+
+        @Override
+        Mono<Integer> unlock(Mono<Integer> integerMono) {
+            return integerMono
+                    .transform(lock::unlockOnNext)
+                    .doOnNext(i -> assertNotEquals(9, i % 10))
+                    .doOnError(SomeException.class, e -> assertEquals(9, e.getI() % 10))
+                    .transform(lock::unlockOnError);
+        }
+
+        @Override
+        void verifyLock(Integer i) {
+            assertTrue(set.add(i));
+            assertTrue(readers.incrementAndGet() <= limit);
+        }
+
+        @Override
+        Mono<Integer> verifyBeforeUnlock(Integer i) {
+            assertTrue(set.contains(i));
+            assertTrue(readers.decrementAndGet() >= 0);
+            if (i % 10 == 9) {
+                return Mono.error(new SomeException(i));
+            } else {
+                return Mono.just(i);
+            }
+        }
+
+        @Override
+        Mono<Integer> verifyUnlock(Mono<Integer> integerMono) {
+            return integerMono.onErrorResume(SomeException.class, e -> Mono.just(e.getI()));
+        }
     }
 
 }

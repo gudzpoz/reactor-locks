@@ -18,20 +18,22 @@ package party.iroiro.lock;
 
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
-import reactor.core.publisher.Flux;
+import org.junit.platform.commons.annotation.Testable;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
-import java.util.ArrayList;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Testable
 public class LockTest {
     @Test
     public void sinkTest() {
@@ -59,64 +61,106 @@ public class LockTest {
     }
 
     @RepeatedTest(value = 1000)
-    public void lockTestMultiple() {
-        lockTest(100, 0, false);
-        lockTest(100, 0, true);
+    public void lockTestHundredConcurrency() {
+        lockTest(new ReactiveLock(), 100, 0, null);
+        lockTest(new ReactiveLock(), 100, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 1000)
+    public void broadcastingLockTestHundredConcurrency() {
+        lockTest(new BroadcastingLock(), 100, 0, null);
+        lockTest(new BroadcastingLock(), 100, 0, Schedulers.parallel());
     }
 
     @RepeatedTest(value = 10000)
-    public void lockTwoTest() {
-        lockTest(2, 0, false);
-        lockTest(2, 1, true);
+    public void lockTestPairConcurrency() {
+        lockTest(new ReactiveLock(), 2, 0, null);
+        lockTest(new ReactiveLock(), 2, 1, Schedulers.parallel());
     }
 
-    private void lockTest(int count, int delay, boolean scheduler) {
-        ReactiveLock lock = new ReactiveLock();
-        ArrayList<Mono<Integer>> mono = new ArrayList<>(count);
-        long totalDelay = 0;
-        Scheduler elastic = Schedulers.boundedElastic();
-        Scheduler parallel = Schedulers.parallel();
-        AtomicBoolean checker = new AtomicBoolean(false);
-        for (int i = 0; i < count; i++) {
-            totalDelay += delay;
-            mono.add(
-                    (scheduler ?
-                            Mono.just(i)
-                                    .publishOn((i & 1) == 0 ? elastic : parallel)
-                            :
-                            Mono.just(i))
+    @RepeatedTest(value = 10000)
+    public void broadcastingLockTestPairConcurrency() {
+        lockTest(new BroadcastingLock(), 2, 0, null);
+        lockTest(new BroadcastingLock(), 2, 1, Schedulers.parallel());
+    }
 
-                            .transform(lock::lock)
-                            .flatMap(ii -> {
-                                if (checker.getAndSet(true)) {
-                                    return Mono.error(new IllegalStateException("Oops"));
-                                } else {
-                                    return Mono.just(ii);
-                                }
-                            })
-                            .delayElement(Duration.ofMillis(delay))
-                            .flatMap(ii -> {
-                                if (checker.getAndSet(false)) {
-                                    if (ii % 10 == 9) {
-                                        return Mono.error(new SomeException(ii));
-                                    } else {
-                                        return Mono.just(ii);
-                                    }
-                                } else {
-                                    return Mono.error(new IllegalStateException("Oops"));
-                                }
-                            })
-                            .transform(lock::unlockOnTerminate)
-                            .onErrorResume(SomeException.class, e -> Mono.just(e.getI())
-                            )
-            );
+    @RepeatedTest(value = 3000)
+    public void largeAudienceTest() {
+        lockTest(new ReactiveLock(), 500, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 3000)
+    public void largeAudienceBroadcastTest() {
+        lockTest(new BroadcastingLock(), 500, 0, Schedulers.parallel());
+    }
+
+    private void lockTest(Lock lock, int concurrency, int delay, Scheduler scheduler) {
+        Helper lockTester = new Helper(lock, concurrency,
+                () -> Duration.of(delay, ChronoUnit.MICROS), scheduler);
+        lockTester.verify().block();
+    }
+
+    static class Helper extends LockTestHelper<Lock> {
+        final Set<Integer> set;
+        final AtomicBoolean locked;
+        private final Scheduler scheduler;
+
+        Helper(Lock lock, int concurrency, Supplier<Duration> delay, Scheduler scheduler) {
+            super(lock, concurrency, delay);
+            this.scheduler = scheduler;
+            set = new ConcurrentSkipListSet<>();
+            locked = new AtomicBoolean(false);
         }
-        Set<Integer> set = new ConcurrentSkipListSet<>();
-        long start = System.nanoTime();
-        assertDoesNotThrow(() -> Flux.merge(mono).doOnNext(set::add).blockLast());
-        long end = System.nanoTime();
-        assertEquals(count, set.size());
-        assertTrue(scheduler || totalDelay * 1000_000 <= end - start);
+
+        @Override
+        protected void verifyFinally() {
+            assertEquals(concurrency, set.size());
+        }
+
+        @Override
+        Mono<Integer> schedule(Mono<Integer> integerMono) {
+            if (scheduler == null) {
+                return integerMono;
+            } else {
+                return integerMono.publishOn(scheduler);
+            }
+        }
+
+        @Override
+        Mono<Integer> lock(Mono<Integer> integerMono) {
+            return integerMono.transform(lock::lockOnNext);
+        }
+
+        @Override
+        Mono<Integer> unlock(Mono<Integer> integerMono) {
+            return integerMono
+                    .transform(lock::unlockOnNext)
+                    .doOnNext(i -> assertNotEquals(9, i % 10))
+                    .doOnError(SomeException.class, e -> assertEquals(9, e.getI() % 10))
+                    .transform(lock::unlockOnError);
+        }
+
+        @Override
+        void verifyLock(Integer i) {
+            assertTrue(set.add(i));
+            assertFalse(locked.getAndSet(true));
+        }
+
+        @Override
+        Mono<Integer> verifyBeforeUnlock(Integer i) {
+            assertTrue(set.contains(i));
+            assertTrue(locked.getAndSet(false));
+            if (i % 10 == 9) {
+                return Mono.error(new SomeException(i));
+            } else {
+                return Mono.just(i);
+            }
+        }
+
+        @Override
+        Mono<Integer> verifyUnlock(Mono<Integer> integerMono) {
+            return integerMono.onErrorResume(SomeException.class, e -> Mono.just(e.getI()));
+        }
     }
 
 }

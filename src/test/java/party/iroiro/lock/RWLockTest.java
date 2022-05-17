@@ -17,118 +17,130 @@
 package party.iroiro.lock;
 
 import org.junit.jupiter.api.RepeatedTest;
-import reactor.core.publisher.Flux;
+import org.junit.platform.commons.annotation.Testable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
-import java.util.ArrayList;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
+@Testable
 public class RWLockTest {
     @RepeatedTest(value = 1000)
     public void rwLockTest() {
-        rwLockTest(2, 0, false);
-        rwLockTest(2, 1, false);
-        rwLockTest(10, 0, true);
-        rwLockTest(10, 1, true);
+        rwLockTest(2, 0, null);
+        rwLockTest(2, 1, null);
+        rwLockTest(10, 0, Schedulers.parallel());
+        rwLockTest(10, 1, Schedulers.parallel());
     }
 
-    private void rwLockTest(int count, int delay, boolean scheduler) {
-        ReactiveRWLock lock = new ReactiveRWLock();
-        ArrayList<Mono<Integer>> monoCollection = new ArrayList<>(count);
-        long totalDelay = 0;
-        Scheduler elastic = Schedulers.boundedElastic();
-        Scheduler parallel = Schedulers.parallel();
-        AtomicBoolean writing = new AtomicBoolean(false);
-        AtomicInteger readers = new AtomicInteger(0);
-        for (int i = 0; i < count; i++) {
-            totalDelay += delay;
-            int finalI = i;
-            monoCollection.add(
-                    (scheduler ?
-                            Mono.just(i)
-                                    .publishOn((i & 1) == 0 ? elastic : parallel)
-                            :
-                            Mono.just(i))
+    @RepeatedTest(value = 1000)
+    public void largeAudienceRWLockTest() {
+        rwLockTest(500, 0, Schedulers.parallel());
+        rwLockTest(500, 1, Schedulers.parallel());
+    }
 
-                            .transform(mono -> {
-                                if (finalI % 2 == 0) {
-                                    /* Writer */
-                                    return mono
-                                            .transform(lock::lock)
-                                            .flatMap(ii -> {
-                                                if (writing.getAndSet(true)) {
-                                                    return Mono.error(new IllegalStateException("Writing already"));
-                                                } else {
-                                                    if (readers.get() == 0) {
-                                                        return Mono.just(ii);
-                                                    } else {
-                                                        return Mono.error(new IllegalStateException("Reading already"));
-                                                    }
-                                                }
-                                            })
-                                            .delayElement(Duration.ofMillis(delay))
-                                            .flatMap(ii -> {
-                                                if (writing.getAndSet(false)) {
-                                                    if (readers.get() == 0) {
-                                                        if (ii % 10 == 8) {
-                                                            return Mono.error(new SomeException(ii));
-                                                        } else {
-                                                            return Mono.just(ii);
-                                                        }
-                                                    } else {
-                                                        return Mono.error(new IllegalStateException("Reading before unlocking"));
-                                                    }
-                                                } else {
-                                                    return Mono.error(new IllegalStateException("Not writing"));
-                                                }
-                                            })
-                                            .transform(lock::unlockOnTerminate)
-                                            .onErrorResume(SomeException.class, e -> Mono.just(e.getI()));
-                                } else {
-                                    /* Reader */
-                                    return mono
-                                            .transform(lock::rLock)
-                                            .flatMap(ii -> {
-                                                readers.incrementAndGet();
-                                                if (writing.get()) {
-                                                    return Mono.error(new IllegalStateException("Oops writing"));
-                                                } else {
-                                                    return Mono.just(ii);
-                                                }
-                                            })
-                                            .delayElement(Duration.ofMillis(delay))
-                                            .flatMap(ii -> {
-                                                readers.decrementAndGet();
-                                                if (writing.get()) {
-                                                    return Mono.error(new IllegalStateException("Oops"));
-                                                } else {
-                                                    return Mono.just(ii);
-                                                }
-                                            })
-                                            .transform(lock::rUnlockOnTerminate);
-                                }
-                            })
-            );
+    private void rwLockTest(int count, int delay, Scheduler scheduler) {
+        Helper helper = new Helper(new ReactiveRWLock(), count,
+                () -> Duration.of(delay, ChronoUnit.MICROS), scheduler);
+        helper.verify().block();
+    }
+
+    static class Helper extends LockTestHelper<RWLock> {
+        final Set<Integer> set;
+        final AtomicBoolean writing;
+        final AtomicInteger readers;
+        private final Scheduler scheduler;
+
+        boolean isReader(int i) {
+            return i % 3 != 0;
         }
-        Set<Integer> set = new ConcurrentSkipListSet<>();
-        long start = System.nanoTime();
-        assertDoesNotThrow(() -> Flux.merge(monoCollection).doOnNext(
-                set::add
-        ).blockLast());
-        long end = System.nanoTime();
-        assertEquals(count, set.size());
-        assertTrue(scheduler || totalDelay * 1000_000 <= end - start);
-        assertFalse(writing.get());
-        assertEquals(0, readers.get());
+
+        boolean shouldFails(int i) {
+            return i % 7 == 2;
+        }
+
+        Helper(RWLock lock, int concurrency, Supplier<Duration> delay, Scheduler scheduler) {
+            super(lock, concurrency, delay);
+            this.scheduler = scheduler;
+            set = new ConcurrentSkipListSet<>();
+            writing = new AtomicBoolean(false);
+            readers = new AtomicInteger(0);
+        }
+
+        @Override
+        protected void verifyFinally() {
+            assertEquals(concurrency, set.size());
+            assertEquals(0, readers.get());
+            assertFalse(writing.get());
+        }
+
+        @Override
+        Mono<Integer> schedule(Mono<Integer> integerMono) {
+            if (scheduler == null) {
+                return integerMono;
+            } else {
+                return integerMono.publishOn(scheduler);
+            }
+        }
+
+        @Override
+        Mono<Integer> lock(Mono<Integer> integerMono) {
+            return integerMono.flatMap(t ->
+                    (isReader(t) ? lock.rLock() : lock.lock()).thenReturn(t));
+        }
+
+        @Override
+        Mono<Integer> unlock(Mono<Integer> integerMono) {
+            return integerMono
+
+                    .doOnNext(i -> assertFalse(shouldFails(i)))
+                    .doOnError(SomeException.class, e -> assertTrue(shouldFails(e.getI())))
+                    .onErrorResume(SomeException.class, e -> Mono.just(e.getI()))
+
+                    .flatMap(i -> isReader(i) ? Mono.just(i) : Mono.error(new SomeException(i)))
+                    .transform(lock::rUnlockOnNext)
+                    .transform(lock::unlockOnError)
+                    .onErrorResume(SomeException.class, e -> Mono.just(e.getI()));
+        }
+
+        @Override
+        void verifyLock(Integer i) {
+            assertTrue(set.add(i));
+            if (isReader(i)) {
+                readers.incrementAndGet();
+                assertFalse(writing.get());
+            } else {
+                assertEquals(0, readers.get());
+                assertFalse(writing.getAndSet(true));
+            }
+        }
+
+        @Override
+        Mono<Integer> verifyBeforeUnlock(Integer i) {
+            assertTrue(set.contains(i));
+            if (isReader(i)) {
+                readers.decrementAndGet();
+                assertFalse(writing.get());
+            } else {
+                assertEquals(0, readers.get());
+                assertTrue(writing.getAndSet(false));
+            }
+            return shouldFails(i) ? Mono.error(new SomeException(i)) : Mono.just(i);
+        }
+
+        @Override
+        Mono<Integer> verifyUnlock(Mono<Integer> integerMono) {
+            return integerMono.onErrorResume(SomeException.class, e -> Mono.just(e.getI()));
+        }
     }
 
 }
