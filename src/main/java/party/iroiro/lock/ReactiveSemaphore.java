@@ -43,16 +43,20 @@ public class ReactiveSemaphore extends Lock {
             count++;
             return Mono.empty();
         } else {
-            return SinkUtils.queue(queue);
+            return SinkUtils.queue(queue, empty -> {
+                synchronized (this) {
+                    if (!empty.tryEmitEmpty().isSuccess()) {
+                        /* Race condition: Emitted by previous unlock */
+                        unlock();
+                    }
+                }
+            });
         }
     }
 
     public synchronized void unlock() {
-        Sinks.Empty<Void> next = queue.poll();
-        if (next == null) {
+        if (SinkUtils.emitAndCheckShouldUnlock(queue)) {
             count--;
-        } else {
-            next.tryEmitEmpty();
         }
     }
 }

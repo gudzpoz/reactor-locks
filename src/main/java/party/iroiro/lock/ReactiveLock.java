@@ -34,17 +34,21 @@ public class ReactiveLock extends Lock {
     }
 
     public synchronized void unlock() {
-        Sinks.Empty<Void> sink = queue.poll();
-        if (sink == null) {
+        if (SinkUtils.emitAndCheckShouldUnlock(queue)) {
             locked = false;
-        } else {
-            sink.tryEmitEmpty();
         }
     }
 
     public synchronized Mono<Void> lock() {
         if (locked) {
-            return SinkUtils.queue(queue);
+            return SinkUtils.queue(queue, (empty) -> {
+                synchronized (this) {
+                    if (!empty.tryEmitEmpty().isSuccess()) {
+                        /* Race condition: Emitted by previous unlock */
+                        unlock();
+                    }
+                }
+            });
         } else {
             locked = true;
             return Mono.empty();

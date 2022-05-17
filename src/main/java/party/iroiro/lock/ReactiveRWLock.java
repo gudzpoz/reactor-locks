@@ -43,13 +43,19 @@ public class ReactiveRWLock extends RWLock {
             state = State.WRITING;
             return Mono.empty();
         } else {
-            return SinkUtils.queue(writers);
+            return SinkUtils.queue(writers, empty -> {
+                synchronized (this) {
+                    if (!empty.tryEmitEmpty().isSuccess()) {
+                        /* Race condition: Emitted by previous unlock / rUnlock */
+                        unlock();
+                    }
+                }
+            });
         }
     }
 
     public synchronized void unlock() {
-        Sinks.Empty<Void> next = writers.poll();
-        if (next == null) {
+        if (SinkUtils.emitAndCheckShouldUnlock(writers)) {
             if (readerCount == 0) {
                 state = State.NONE;
             } else {
@@ -60,8 +66,6 @@ public class ReactiveRWLock extends RWLock {
                     reader = readers.poll();
                 }
             }
-        } else {
-            next.tryEmitEmpty();
         }
     }
 
@@ -75,21 +79,20 @@ public class ReactiveRWLock extends RWLock {
             case READING:
                 return Mono.empty();
             case WRITING:
-                return SinkUtils.queue(readers);
+                return SinkUtils.queue(readers, empty -> rUnlock());
             default:
                 return Mono.never();
         }
     }
 
+    @Override
     public synchronized void rUnlock() {
         readerCount--;
         if (readerCount == 0) {
-            Sinks.Empty<Void> writer = writers.poll();
-            if (writer == null) {
+            if (SinkUtils.emitAndCheckShouldUnlock(writers)) {
                 state = State.NONE;
             } else {
                 state = State.WRITING;
-                writer.tryEmitEmpty();
             }
         }
     }

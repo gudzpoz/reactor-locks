@@ -45,11 +45,25 @@ public class BroadcastingLock extends Lock {
 
     @Override
     public Mono<Void> lock() {
+        final AtomicBoolean lockedByMe = new AtomicBoolean(false);
         return queue.filter(ignored -> {
             synchronized (this) {
-                return unlocked.getAndSet(false);
+                if (lockedByMe.get()) {
+                    /* Race condition: Cancelled */
+                    return false;
+                } else {
+                    lockedByMe.set(unlocked.getAndSet(false));
+                    return lockedByMe.get();
+                }
             }
-        }).next().then();
+        }).next().then().doOnCancel(() -> {
+            synchronized (this) {
+                if (lockedByMe.getAndSet(true)) {
+                    /* Race condition: Locked just acquired */
+                    unlock();
+                }
+            }
+        });
     }
 
     @Override
