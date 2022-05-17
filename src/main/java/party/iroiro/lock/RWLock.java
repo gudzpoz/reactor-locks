@@ -66,10 +66,7 @@ public abstract class RWLock extends Lock {
      * @return the transformed {@link Mono}
      */
     public <T> Mono<T> rUnlockOnEmpty(Mono<T> mono) {
-        return mono.switchIfEmpty(Mono.fromCallable(() -> {
-            this.rUnlock();
-            return null;
-        }));
+        return mono.switchIfEmpty(Mono.fromRunnable(this::rUnlock));
     }
 
     /**

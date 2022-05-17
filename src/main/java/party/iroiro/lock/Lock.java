@@ -181,10 +181,7 @@ public abstract class Lock {
      * @return the transformed {@link Mono}
      */
     public <T> Mono<T> unlockOnEmpty(Mono<T> mono) {
-        return mono.switchIfEmpty(Mono.fromCallable(() -> {
-            this.unlock();
-            return null;
-        }));
+        return mono.switchIfEmpty(Mono.fromRunnable(this::unlock));
     }
 
     /**

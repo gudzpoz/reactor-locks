@@ -104,6 +104,21 @@ return lockedMono
 </tr>
 <tr><td>
 
+`Lock::unlockOnEmpty`
+
+`RWLock::rUnlockOnEmpty`</td><td>
+
+```java
+return lockedMono
+      .transform(lock::unlockOnEmpty)
+      .switchIfEmpty(Mono.fromRunnable(() ->
+              log.info("Lock released");
+      );
+```
+</td>
+</tr>
+<tr><td>
+
 `Lock::unlockOnError`
 
 `RWLock::rUnlockOnError`</td><td>
