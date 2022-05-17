@@ -33,7 +33,7 @@ public abstract class Lock {
      * <pre><code>
      *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .flatMap(t -> lock.<b>lock()</b>.thenReturn(t))
+     *         .flatMap(t -&gt; lock.<b>lock()</b>.thenReturn(t))
      *         /* Some processing &#42;/
      *         .transform(lock::unlock)
      *         .block();

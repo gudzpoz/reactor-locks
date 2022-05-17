@@ -26,7 +26,7 @@ public abstract class RWLock extends Lock {
 
 
     /**
-     * See {@link Lock#lock)} for details.
+     * See {@link Lock#lock} for details.
      *
      * <p>
      * The difference is that the underlying implementation might choose to implement a
