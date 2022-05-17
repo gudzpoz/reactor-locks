@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 abstract class LockTestHelper<T extends Lock> {
     protected final T lock;
     protected final int concurrency;
-    private final Supplier<Duration> delay;
+    protected final Supplier<Duration> delay;
     LockTestHelper(T lock, int concurrency, Supplier<Duration> delay) {
         this.lock = lock;
         this.concurrency = concurrency;

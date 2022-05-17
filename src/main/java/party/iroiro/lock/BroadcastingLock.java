@@ -18,6 +18,7 @@ package party.iroiro.lock;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -29,6 +30,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Since it is broadcasting, it get slower as the concurrency increases. But its
  * performance is comparable to {@link ReactiveLock} within ~100 concurrency, which
  * is still not that likely to get surmounted easily.
+ * </p>
+ * <p>
+ * Also, handling {@link SignalType#CANCEL} also slows down a bit.
  * </p>
  */
 public class BroadcastingLock extends Lock {
@@ -59,7 +63,7 @@ public class BroadcastingLock extends Lock {
         }).next().then().doOnCancel(() -> {
             synchronized (this) {
                 if (lockedByMe.getAndSet(true)) {
-                    /* Race condition: Locked just acquired */
+                    /* Race condition: Lock just acquired */
                     unlock();
                 }
             }

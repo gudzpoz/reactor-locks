@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
@@ -94,9 +95,19 @@ public class LockTest {
         lockTest(new BroadcastingLock(), 500, 0, Schedulers.parallel());
     }
 
+    @RepeatedTest(value = 100)
+    public void timeoutTest() {
+        lockTest(new ReactiveLock(), 50, 10, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 100)
+    public void timeoutBroadcastingTest() {
+        lockTest(new BroadcastingLock(), 50, 10, Schedulers.parallel());
+    }
+
     private void lockTest(Lock lock, int concurrency, int delay, Scheduler scheduler) {
         Helper lockTester = new Helper(lock, concurrency,
-                () -> Duration.of(delay, ChronoUnit.MICROS), scheduler);
+                () -> Duration.of(delay, ChronoUnit.MILLIS), scheduler);
         lockTester.verify().block();
     }
 
@@ -128,7 +139,11 @@ public class LockTest {
 
         @Override
         Mono<Integer> lock(Mono<Integer> integerMono) {
-            return integerMono.transform(lock::lockOnNext);
+            Duration duration = delay.get().multipliedBy(concurrency / 2);
+            return duration.isZero()
+                    ? integerMono.transform(lock::lockOnNext)
+                    : integerMono.flatMap(i -> lock.lockOnNext(Mono.just(i)).timeout(duration)
+                            .doOnError(e -> assertTrue(set.add(i))));
         }
 
         @Override
@@ -137,6 +152,7 @@ public class LockTest {
                     .transform(lock::unlockOnNext)
                     .doOnNext(i -> assertNotEquals(9, i % 10))
                     .doOnError(SomeException.class, e -> assertEquals(9, e.getI() % 10))
+                    .onErrorResume(TimeoutException.class, e -> Mono.just(-1))
                     .transform(lock::unlockOnError);
         }
 

@@ -50,15 +50,13 @@ class SinkUtils {
      *         <code>true</code> if the emission failed and the lock can now be removed
      */
     static boolean emitAndCheckShouldUnlock(ConcurrentLinkedQueue<Sinks.Empty<Void>> queue) {
-        boolean success = false;
         Sinks.Empty<Void> sink = queue.poll();
         while (sink != null) {
-            success = sink.tryEmitEmpty().isSuccess();
-            if (success) {
-                break;
+            if (sink.tryEmitEmpty().isSuccess()) {
+                return false;
             }
             sink = queue.poll();
         }
-        return !success;
+        return true;
     }
 }

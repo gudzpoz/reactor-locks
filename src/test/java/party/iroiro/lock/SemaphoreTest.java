@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -39,9 +40,15 @@ public class SemaphoreTest {
         semaphoreTest(100, 5, 1, Schedulers.parallel());
     }
 
+    @RepeatedTest(value = 200)
+    public void semaphoreTimeoutTest() {
+        semaphoreTest(100, 20, 10, null);
+        semaphoreTest(100, 20, 10, Schedulers.parallel());
+    }
+
     private void semaphoreTest(int count, int limit, int delay, Scheduler scheduler) {
         Helper helper = new Helper(new ReactiveSemaphore(limit), count, () ->
-                Duration.of(delay, ChronoUnit.MICROS), limit, scheduler);
+                Duration.of(delay, ChronoUnit.MILLIS), limit, scheduler);
         helper.verify().block();
     }
 
@@ -75,7 +82,11 @@ public class SemaphoreTest {
 
         @Override
         Mono<Integer> lock(Mono<Integer> integerMono) {
-            return integerMono.transform(lock::lockOnNext);
+            Duration duration = delay.get().multipliedBy(concurrency / 2);
+            return duration.isZero()
+                    ? integerMono.transform(lock::lockOnNext)
+                    : integerMono.flatMap(i -> lock.lockOnNext(Mono.just(i)).timeout(duration)
+                    .doOnError(e -> assertTrue(set.add(i))));
         }
 
         @Override
@@ -84,6 +95,7 @@ public class SemaphoreTest {
                     .transform(lock::unlockOnNext)
                     .doOnNext(i -> assertNotEquals(9, i % 10))
                     .doOnError(SomeException.class, e -> assertEquals(9, e.getI() % 10))
+                    .onErrorResume(TimeoutException.class, e -> Mono.just(-1))
                     .transform(lock::unlockOnError);
         }
 

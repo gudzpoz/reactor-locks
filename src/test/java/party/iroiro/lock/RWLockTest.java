@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -34,15 +35,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Testable
 public class RWLockTest {
-    @RepeatedTest(value = 1000)
+    @RepeatedTest(value = 3000)
     public void rwLockTest() {
         rwLockTest(2, 0, null);
         rwLockTest(2, 1, null);
         rwLockTest(10, 0, Schedulers.parallel());
-        rwLockTest(10, 1, Schedulers.parallel());
+        rwLockTest(5, 1, Schedulers.parallel());
     }
 
-    @RepeatedTest(value = 1000)
+    @RepeatedTest(value = 3000)
     public void largeAudienceRWLockTest() {
         rwLockTest(500, 0, Schedulers.parallel());
         rwLockTest(500, 1, Schedulers.parallel());
@@ -60,20 +61,20 @@ public class RWLockTest {
         final AtomicInteger readers;
         private final Scheduler scheduler;
 
-        boolean isReader(int i) {
-            return i % 3 != 0;
-        }
-
-        boolean shouldFails(int i) {
-            return i % 7 == 2;
-        }
-
         Helper(RWLock lock, int concurrency, Supplier<Duration> delay, Scheduler scheduler) {
             super(lock, concurrency, delay);
             this.scheduler = scheduler;
             set = new ConcurrentSkipListSet<>();
             writing = new AtomicBoolean(false);
             readers = new AtomicInteger(0);
+        }
+
+        boolean isReader(int i) {
+            return i % 3 != 0;
+        }
+
+        boolean shouldFails(int i) {
+            return i % 7 == 2;
         }
 
         @Override
@@ -94,22 +95,12 @@ public class RWLockTest {
 
         @Override
         Mono<Integer> lock(Mono<Integer> integerMono) {
-            return integerMono.flatMap(t ->
-                    (isReader(t) ? lock.rLock() : lock.lock()).thenReturn(t));
-        }
-
-        @Override
-        Mono<Integer> unlock(Mono<Integer> integerMono) {
-            return integerMono
-
-                    .doOnNext(i -> assertFalse(shouldFails(i)))
-                    .doOnError(SomeException.class, e -> assertTrue(shouldFails(e.getI())))
-                    .onErrorResume(SomeException.class, e -> Mono.just(e.getI()))
-
-                    .flatMap(i -> isReader(i) ? Mono.just(i) : Mono.error(new SomeException(i)))
-                    .transform(lock::rUnlockOnNext)
-                    .transform(lock::unlockOnError)
-                    .onErrorResume(SomeException.class, e -> Mono.just(e.getI()));
+            return integerMono.flatMap(t -> {
+                Duration duration = delay.get().multipliedBy(concurrency / 2);
+                return (isReader(t) ? lock.rLock() : lock.lock()).thenReturn(t)
+                        .timeout(duration)
+                        .doOnError(TimeoutException.class, e -> assertTrue(set.add(t)));
+            });
         }
 
         @Override
@@ -135,6 +126,21 @@ public class RWLockTest {
                 assertTrue(writing.getAndSet(false));
             }
             return shouldFails(i) ? Mono.error(new SomeException(i)) : Mono.just(i);
+        }
+
+        @Override
+        Mono<Integer> unlock(Mono<Integer> integerMono) {
+            return integerMono
+
+                    .doOnNext(i -> assertFalse(shouldFails(i)))
+                    .doOnError(SomeException.class, e -> assertTrue(shouldFails(e.getI())))
+                    .onErrorResume(SomeException.class, e -> Mono.just(e.getI()))
+
+                    .flatMap(i -> isReader(i) ? Mono.just(i) : Mono.error(new SomeException(i)))
+                    .transform(lock::rUnlockOnNext)
+                    .onErrorResume(TimeoutException.class, e -> Mono.just(-1))
+                    .transform(lock::unlockOnError)
+                    .onErrorResume(SomeException.class, e -> Mono.just(e.getI()));
         }
 
         @Override
