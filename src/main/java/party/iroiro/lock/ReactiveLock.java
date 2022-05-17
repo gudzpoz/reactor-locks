@@ -33,27 +33,21 @@ public class ReactiveLock extends Lock {
         locked = false;
     }
 
-    public void unlock() {
-        synchronized (this) {
-            Sinks.Empty<Void> sink = queue.poll();
-            if (sink == null) {
-                locked = false;
-            } else {
-                sink.tryEmitEmpty();
-            }
+    public synchronized void unlock() {
+        Sinks.Empty<Void> sink = queue.poll();
+        if (sink == null) {
+            locked = false;
+        } else {
+            sink.tryEmitEmpty();
         }
     }
 
-    public <T> Mono<T> lock(Mono<T> mono) {
-        return mono.flatMap(t -> {
-            synchronized (this) {
-                if (locked) {
-                    return SinkUtils.queue(queue, t);
-                } else {
-                    locked = true;
-                    return Mono.just(t);
-                }
-            }
-        });
+    public synchronized Mono<Void> lock() {
+        if (locked) {
+            return SinkUtils.queue(queue);
+        } else {
+            locked = true;
+            return Mono.empty();
+        }
     }
 }

@@ -25,6 +25,30 @@ import java.util.function.Consumer;
  */
 public abstract class Lock {
     /**
+     * Get a {@link Mono} that emits success only after acquiring the lock
+     *
+     * <p>
+     * Usage:
+     * </p>
+     * <pre><code>
+     *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
+     *     mono
+     *         .flatMap(t -> lock.<b>lock()</b>.thenReturn(t))
+     *         /* Some processing &#42;/
+     *         .transform(lock::unlock)
+     *         .block();
+     * </code></pre>
+     *
+     * <p>
+     * The underlying implementation should automatically queue the {@link Mono} up
+     * if the lock is not available.
+     * </p>
+     *
+     * @return a {@link Mono} that emits success when the lock is acquired
+     */
+    public abstract Mono<Void> lock();
+
+    /**
      * Try to acquire the lock on the next element before propagating
      *
      * <p>
@@ -33,7 +57,7 @@ public abstract class Lock {
      * <pre><code>
      *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(lock::<b>lock</b>)
+     *         .transform(lock::<b>lockOnNext</b>)
      *         /* Some processing &#42;/
      *         .transform(lock::unlock)
      *         .block();
@@ -51,7 +75,9 @@ public abstract class Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public abstract <T> Mono<T> lock(Mono<T> mono);
+    public <T> Mono<T> lockOnNext(Mono<T> mono) {
+        return mono.flatMap(t -> this.lock().thenReturn(t));
+    }
 
     /**
      * Unlocks

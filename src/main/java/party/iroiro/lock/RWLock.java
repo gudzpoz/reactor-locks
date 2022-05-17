@@ -24,8 +24,21 @@ import reactor.core.publisher.Mono;
  */
 public abstract class RWLock extends Lock {
 
+
     /**
-     * See {@link Lock#lock(Mono)} for details.
+     * See {@link Lock#lock)} for details.
+     *
+     * <p>
+     * The difference is that the underlying implementation might choose to implement a
+     * <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">Readers–writer lock</a>.
+     * </p>
+     *
+     * @return a {@link Mono} that emits success when the lock is acquired
+     */
+    public abstract Mono<Void> rLock();
+
+    /**
+     * See {@link Lock#lockOnNext(Mono)} for details.
      *
      * <p>
      * The difference is that the underlying implementation might choose to implement a
@@ -36,7 +49,9 @@ public abstract class RWLock extends Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public abstract <T> Mono<T> rLock(Mono<T> mono);
+    public <T> Mono<T> rLockOnNext(Mono<T> mono) {
+        return mono.flatMap(t -> this.rLock().thenReturn(t));
+    }
 
     /**
      * See {@link Lock#unlock} for details.
