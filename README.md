@@ -6,7 +6,7 @@
 
 [![Build and Publish](https://github.com/gudzpoz/reactor-locks/actions/workflows/build.yml/badge.svg)](https://github.com/gudzpoz/reactor-locks/actions/workflows/build.yml)
 [![Build and Publish](https://github.com/gudzpoz/reactor-locks/actions/workflows/test.yml/badge.svg)](https://github.com/gudzpoz/reactor-locks/actions/workflows/test.yml)
-[![Codecov](https://img.shields.io/codecov/c/github/gudzpoz/reactor-locks.svg?label=Coverage)]()
+[![Codecov](https://img.shields.io/codecov/c/github/gudzpoz/reactor-locks.svg?label=Coverage)](https://app.codecov.io/gh/gudzpoz/reactor-locks)
 
 Reactor Locks is a library providing reactive access to locks with [Project Reactor](https://projectreactor.io/).
 

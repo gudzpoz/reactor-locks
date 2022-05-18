@@ -3,6 +3,8 @@ name: Test Coverage
 on:
   workflow_dispatch:
     branches: [ main ]
+  push:
+    branches: [ main ]
 
 jobs:
   build-and-publish:
