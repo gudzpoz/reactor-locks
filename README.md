@@ -38,7 +38,7 @@ class Example {
 <dependency>
   <groupId>party.iroiro</groupId>
   <artifactId>reactor-locks</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
 </dependency>
 ```
 
@@ -48,7 +48,7 @@ class Example {
 <summary>Gradle</summary>
 
 ```groovy
-implementation 'party.iroiro:reactor-locks:0.3.0'
+implementation 'party.iroiro:reactor-locks:0.4.0'
 ```
 
 </details>
