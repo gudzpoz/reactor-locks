@@ -54,6 +54,11 @@ public class ReactiveSemaphore extends Lock {
         }
     }
 
+    @Override
+    public synchronized boolean isLocked() {
+        return count >= limit;
+    }
+
     public synchronized void unlock() {
         if (SinkUtils.emitAndCheckShouldUnlock(queue)) {
             count--;

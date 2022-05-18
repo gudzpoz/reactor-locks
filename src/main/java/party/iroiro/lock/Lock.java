@@ -60,6 +60,17 @@ public abstract class Lock {
     public abstract Mono<Void> lock();
 
     /**
+     * Checks whether this lock is locked (or has reached the max lock holders)
+     *
+     * <p>
+     * You should not rely on the result of this due to possible concurrent operations.
+     * </p>
+     *
+     * @return whether this lock is locked
+     */
+    public abstract boolean isLocked();
+
+    /**
      * Try to acquire the lock on the next element before propagating
      *
      * <p>

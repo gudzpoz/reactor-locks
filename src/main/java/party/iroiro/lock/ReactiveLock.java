@@ -54,4 +54,9 @@ public class ReactiveLock extends Lock {
             return Mono.empty();
         }
     }
+
+    @Override
+    public synchronized boolean isLocked() {
+        return locked;
+    }
 }

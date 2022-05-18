@@ -49,6 +49,17 @@ public abstract class RWLock extends Lock {
     public abstract Mono<Void> rLock();
 
     /**
+     * Checks whether this lock is reader-locked (or has reached the max lock holders)
+     *
+     * <p>
+     * You should not rely on the result of this due to possible concurrent operations.
+     * </p>
+     *
+     * @return whether this lock is reader-locked
+     */
+    public abstract boolean isRLocked();
+
+    /**
      * See {@link Lock#lockOnNext(Mono)} for details.
      *
      * <p>

@@ -71,6 +71,11 @@ public class BroadcastingLock extends Lock {
     }
 
     @Override
+    public synchronized boolean isLocked() {
+        return !unlocked.get();
+    }
+
+    @Override
     public synchronized void unlock() {
         unlocked.set(true);
         broadcast.tryEmitNext(true);

@@ -59,6 +59,11 @@ public class ReactiveRWLock extends RWLock {
         }
     }
 
+    @Override
+    public synchronized boolean isLocked() {
+        return state != State.NONE;
+    }
+
     public synchronized void unlock() {
         if (SinkUtils.emitAndCheckShouldUnlock(writers)) {
             if (readers.isEmpty() && readerCount == 0) {
@@ -108,6 +113,11 @@ public class ReactiveRWLock extends RWLock {
             default:
                 return Mono.never();
         }
+    }
+
+    @Override
+    public synchronized boolean isRLocked() {
+        return state == State.READING;
     }
 
     @Override
