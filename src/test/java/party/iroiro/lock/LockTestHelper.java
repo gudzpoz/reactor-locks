@@ -6,7 +6,7 @@ import reactor.core.publisher.Mono;
 import java.time.Duration;
 import java.util.function.Supplier;
 
-abstract class LockTestHelper<T extends AbstractLock> {
+abstract class LockTestHelper<T extends Lock> {
     protected final T lock;
     protected final int concurrency;
     protected final Supplier<Duration> delay;
