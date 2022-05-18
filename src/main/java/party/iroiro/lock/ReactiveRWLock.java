@@ -21,14 +21,14 @@ import reactor.core.publisher.Sinks;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * An implementation {@link RWLock}. See the Javadoc of {@link RWLock} for details.
+ * An implementation {@link RWLock}. See the Javadoc of {@link Lock} and {@link RWLock} for details.
  *
  * <p>
  * This implementation handles writer hunger. A waiting writer should block (in reactive
- * ways of course) further readers from acquiring the lock.
+ * ways, of course) further readers from acquiring the lock.
  * </p>
  */
-public class ReactiveRWLock extends RWLock {
+public class ReactiveRWLock extends AbstractRWLock {
     private final ConcurrentLinkedQueue<Sinks.Empty<Void>> readers;
     private final ConcurrentLinkedQueue<Sinks.Empty<Void>> writers;
     private int readerCount;

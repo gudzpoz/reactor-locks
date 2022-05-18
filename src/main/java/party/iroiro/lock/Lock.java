@@ -1,19 +1,3 @@
-/*
- * Copyright 2022 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package party.iroiro.lock;
 
 import org.reactivestreams.Publisher;
@@ -26,7 +10,7 @@ import java.util.function.Consumer;
 /**
  * A reactive interface for simple locks (and probably semaphores)
  */
-public abstract class Lock {
+public interface Lock {
     /**
      * Offers more flexibility than {@link #tryLock(Duration)}
      *
@@ -36,7 +20,7 @@ public abstract class Lock {
      *
      * @return a lock handle
      */
-    public abstract LockHandle tryLock();
+    LockHandle tryLock();
 
     /**
      * Tries to acquire the lock, or stop and propagate a {@link TimeoutException} downstream after
@@ -45,17 +29,7 @@ public abstract class Lock {
      * @param duration the time to wait for lock
      * @return a {@link Mono} that emits success when the lock is acquired
      */
-    public Mono<Void> tryLock(Duration duration) {
-        LockHandle lockHandle = tryLock();
-        return lockHandle.mono().timeout(duration)
-                .onErrorResume(TimeoutException.class, e -> {
-                    if (lockHandle.cancel()) {
-                        return Mono.error(e);
-                    } else {
-                        return Mono.empty();
-                    }
-                });
-    }
+    Mono<Void> tryLock(Duration duration);
 
     /**
      * Get a {@link Mono} that emits success only after acquiring the lock
@@ -84,9 +58,7 @@ public abstract class Lock {
      *
      * @return a {@link Mono} that emits success when the lock is acquired
      */
-    public Mono<Void> lock() {
-        return tryLock().mono();
-    }
+    Mono<Void> lock();
 
     /**
      * Checks whether this lock is locked (or has reached the max lock holders)
@@ -97,7 +69,7 @@ public abstract class Lock {
      *
      * @return whether this lock is locked
      */
-    public abstract boolean isLocked();
+    boolean isLocked();
 
     /**
      * Try to acquire the lock on the next element before propagating
@@ -126,9 +98,7 @@ public abstract class Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> lockOnNext(Mono<T> mono) {
-        return mono.flatMap(t -> this.lock().thenReturn(t));
-    }
+    <T> Mono<T> lockOnNext(Mono<T> mono);
 
     /**
      * Unlocks
@@ -148,7 +118,7 @@ public abstract class Lock {
      *         .block();
      * </code></pre>
      */
-    public abstract void unlock();
+    void unlock();
 
     /**
      * Release the lock with {@link Mono#doOnTerminate(Runnable)} before propagating
@@ -175,9 +145,7 @@ public abstract class Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> unlockOnTerminate(Mono<T> mono) {
-        return mono.doOnTerminate(this::unlock);
-    }
+    <T> Mono<T> unlockOnTerminate(Mono<T> mono);
 
     /**
      * Release the lock with {@link Mono#doOnNext(Consumer)} before propagating
@@ -203,9 +171,7 @@ public abstract class Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> unlockOnNext(Mono<T> mono) {
-        return mono.doOnNext(ignored -> this.unlock());
-    }
+    <T> Mono<T> unlockOnNext(Mono<T> mono);
 
     /**
      * Release the lock with {@link Mono#switchIfEmpty(Mono)}
@@ -231,9 +197,7 @@ public abstract class Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> unlockOnEmpty(Mono<T> mono) {
-        return mono.switchIfEmpty(Mono.fromRunnable(this::unlock));
-    }
+    <T> Mono<T> unlockOnEmpty(Mono<T> mono);
 
     /**
      * Release the lock with {@link Mono#doOnError(Consumer)} before propagating
@@ -259,7 +223,5 @@ public abstract class Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> unlockOnError(Mono<T> mono) {
-        return mono.doOnError(ignored -> this.unlock());
-    }
+    <T> Mono<T> unlockOnError(Mono<T> mono);
 }

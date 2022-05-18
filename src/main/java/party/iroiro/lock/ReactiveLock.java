@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * A reactive {@link Lock} implementation. See the Javadoc of {@link Lock}.
  */
-public class ReactiveLock extends Lock {
+public class ReactiveLock extends AbstractLock {
     private final ConcurrentLinkedQueue<Sinks.Empty<Void>> queue;
     private boolean locked;
 

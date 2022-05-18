@@ -18,7 +18,6 @@ package party.iroiro.lock;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -32,7 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * is still not that likely to get surmounted easily.
  * </p>
  */
-public class BroadcastingLock extends Lock {
+public class BroadcastingLock extends AbstractLock {
     private final AtomicBoolean unlocked;
     private final Sinks.Many<Boolean> broadcast;
     private final Flux<Boolean> queue;

@@ -1,19 +1,3 @@
-/*
- * Copyright 2022 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package party.iroiro.lock;
 
 import org.reactivestreams.Publisher;
@@ -26,7 +10,7 @@ import java.util.concurrent.TimeoutException;
  * An reactive interface for <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">
  * reader–writer locks</a>.
  */
-public abstract class RWLock extends Lock {
+public interface RWLock extends Lock {
     /**
      * Offers more flexibility than {@link #tryRLock(Duration)}
      *
@@ -36,7 +20,7 @@ public abstract class RWLock extends Lock {
      *
      * @return a lock handle
      */
-    public abstract LockHandle tryRLock();
+    LockHandle tryRLock();
 
     /**
      * Tries to acquire the reader-lock, or stop and propagate a {@link TimeoutException}
@@ -45,20 +29,10 @@ public abstract class RWLock extends Lock {
      * @param duration the time to wait for lock
      * @return a {@link Mono} that emits success when the lock is acquired
      */
-    public Mono<Void> tryRLock(Duration duration) {
-        LockHandle lockHandle = tryRLock();
-        return lockHandle.mono().timeout(duration)
-                .onErrorResume(TimeoutException.class, e -> {
-                    if (lockHandle.cancel()) {
-                        return Mono.error(e);
-                    } else {
-                        return Mono.empty();
-                    }
-                });
-    }
+    Mono<Void> tryRLock(Duration duration);
 
     /**
-     * See {@link Lock#lock} for details.
+     * See {@link AbstractLock#lock} for details.
      *
      * <p>
      * The difference is that the underlying implementation might choose to implement a
@@ -72,9 +46,7 @@ public abstract class RWLock extends Lock {
      *
      * @return a {@link Mono} that emits success when the lock is acquired
      */
-    public Mono<Void> rLock() {
-        return tryRLock().mono();
-    }
+    Mono<Void> rLock();
 
     /**
      * Checks whether this lock is reader-locked (or has reached the max lock holders)
@@ -85,10 +57,10 @@ public abstract class RWLock extends Lock {
      *
      * @return whether this lock is reader-locked
      */
-    public abstract boolean isRLocked();
+    boolean isRLocked();
 
     /**
-     * See {@link Lock#lockOnNext(Mono)} for details.
+     * See {@link AbstractLock#lockOnNext(Mono)} for details.
      *
      * <p>
      * The difference is that the underlying implementation might choose to implement a
@@ -99,56 +71,46 @@ public abstract class RWLock extends Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> rLockOnNext(Mono<T> mono) {
-        return mono.flatMap(t -> this.rLock().thenReturn(t));
-    }
+    <T> Mono<T> rLockOnNext(Mono<T> mono);
 
     /**
-     * See {@link Lock#unlock} for details.
+     * See {@link AbstractLock#unlock} for details.
      */
-    public abstract void rUnlock();
+    void rUnlock();
 
     /**
-     * See {@link Lock#unlockOnEmpty(Mono)} for details.
+     * See {@link AbstractLock#unlockOnEmpty(Mono)} for details.
      *
      * @param mono the {@link Mono}, of which the next signal, when Mono is empty, will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> rUnlockOnEmpty(Mono<T> mono) {
-        return mono.switchIfEmpty(Mono.fromRunnable(this::rUnlock));
-    }
+    <T> Mono<T> rUnlockOnEmpty(Mono<T> mono);
 
     /**
-     * See {@link Lock#unlockOnNext(Mono)} for details.
+     * See {@link AbstractLock#unlockOnNext(Mono)} for details.
      *
      * @param mono the {@link Mono}, of which the next value will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> rUnlockOnNext(Mono<T> mono) {
-        return mono.doOnNext(ignored -> this.rUnlock());
-    }
+    <T> Mono<T> rUnlockOnNext(Mono<T> mono);
 
     /**
-     * See {@link Lock#unlockOnTerminate(Mono)} for details.
+     * See {@link AbstractLock#unlockOnTerminate(Mono)} for details.
      *
      * @param mono the {@link Mono}, of which the termination signal will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> rUnlockOnTerminate(Mono<T> mono) {
-        return mono.doOnTerminate(this::rUnlock);
-    }
+    <T> Mono<T> rUnlockOnTerminate(Mono<T> mono);
 
     /**
-     * See {@link Lock#unlockOnError(Mono)} for details.
+     * See {@link AbstractLock#unlockOnError(Mono)} for details.
      *
      * @param mono the {@link Mono}, of which the next error will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
-    public <T> Mono<T> rUnlockOnError(Mono<T> mono) {
-        return mono.doOnError(ignored -> this.rUnlock());
-    }
+    <T> Mono<T> rUnlockOnError(Mono<T> mono);
 }

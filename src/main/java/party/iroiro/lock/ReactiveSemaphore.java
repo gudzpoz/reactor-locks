@@ -25,7 +25,7 @@ import java.util.concurrent.Semaphore;
  * An implementation of {@link Lock} that allows multiple lock holders with an upper limit
  * (that is, it is the reactive version of {@link Semaphore}).
  */
-public class ReactiveSemaphore extends Lock {
+public class ReactiveSemaphore extends AbstractLock {
     private final ConcurrentLinkedQueue<Sinks.Empty<Void>> queue;
     private final int limit;
     private int count;
