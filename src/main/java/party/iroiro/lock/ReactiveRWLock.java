@@ -16,7 +16,6 @@
 
 package party.iroiro.lock;
 
-import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -43,17 +42,14 @@ public class ReactiveRWLock extends RWLock {
     }
 
     @Override
-    public synchronized Mono<Void> lock() {
+    public synchronized LockHandle tryLock() {
         if (state == State.NONE) {
             state = State.WRITING;
-            return Mono.empty();
+            return LockHandle.empty();
         } else {
             return SinkUtils.queue(writers, empty -> {
                 synchronized (this) {
-                    if (!empty.tryEmitEmpty().isSuccess()) {
-                        /* Race condition: Emitted by previous unlock / rUnlock */
-                        unlock();
-                    }
+                    return empty.tryEmitEmpty().isSuccess();
                 }
             });
         }
@@ -89,16 +85,16 @@ public class ReactiveRWLock extends RWLock {
     }
 
     @Override
-    public synchronized Mono<Void> rLock() {
+    public synchronized LockHandle tryRLock() {
         switch (state) {
             case NONE:
                 state = State.READING;
                 readerCount++;
-                return Mono.empty();
+                return LockHandle.empty();
             case READING:
                 if (writers.isEmpty()) {
                     readerCount++;
-                    return Mono.empty();
+                    return LockHandle.empty();
                 }
                 /* Fall through */
             case WRITING:
@@ -108,8 +104,11 @@ public class ReactiveRWLock extends RWLock {
                     synchronized (this) {
                         if (empty.tryEmitEmpty().isSuccess()) {
                             readerCount++;
+                            rUnlock();
+                            return true;
+                        } else {
+                            return false;
                         }
-                        rUnlock();
                     }
                 });
         }

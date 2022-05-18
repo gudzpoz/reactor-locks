@@ -18,17 +18,45 @@ package party.iroiro.lock;
 
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
 
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
 /**
  * A reactive interface for simple locks (and probably semaphores)
  */
 public abstract class Lock {
+    /**
+     * Offers more flexibility than {@link #tryLock(Duration)}
+     *
+     * <p>
+     * See {@link LockHandle}
+     * </p>
+     *
+     * @return a lock handle
+     */
+    public abstract LockHandle tryLock();
+
+    /**
+     * Tries to acquire the lock, or stop and propagate a {@link TimeoutException} downstream after
+     * certain duration.
+     *
+     * @param duration the time to wait for lock
+     * @return a {@link Mono} that emits success when the lock is acquired
+     */
+    public Mono<Void> tryLock(Duration duration) {
+        LockHandle lockHandle = tryLock();
+        return lockHandle.mono().timeout(duration)
+                .onErrorResume(TimeoutException.class, e -> {
+                    if (lockHandle.cancel()) {
+                        return Mono.error(e);
+                    } else {
+                        return Mono.empty();
+                    }
+                });
+    }
+
     /**
      * Get a {@link Mono} that emits success only after acquiring the lock
      *
@@ -49,15 +77,16 @@ public abstract class Lock {
      * if the lock is not available.
      * </p>
      * <p>
-     * The underlying implementation should handle the {@link SignalType#CANCEL} signal
-     * correctly, that is, you may use {@link Mono#timeout(Duration)},
-     * {@link Mono#timeout(Publisher)} safely. Timed-out locks need not unlocking,
-     * as is with {@link ReentrantLock#tryLock(long, TimeUnit)}.
+     * <b>Do not</b> use {@link Mono#timeout(Duration)} or {@link Mono#timeout(Publisher)},
+     * which are not handled at all. Use {@link #tryLock(Duration)} or {@link #tryLock()} instead
+     * if you want timeouts.
      * </p>
      *
      * @return a {@link Mono} that emits success when the lock is acquired
      */
-    public abstract Mono<Void> lock();
+    public Mono<Void> lock() {
+        return tryLock().mono();
+    }
 
     /**
      * Checks whether this lock is locked (or has reached the max lock holders)

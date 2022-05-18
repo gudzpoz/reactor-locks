@@ -48,9 +48,9 @@ public class BroadcastingLock extends Lock {
     }
 
     @Override
-    public Mono<Void> lock() {
+    public LockHandle tryLock() {
         final AtomicBoolean lockedByMe = new AtomicBoolean(false);
-        return queue.filter(ignored -> {
+        Mono<Void> request = queue.filter(ignored -> {
             synchronized (this) {
                 if (lockedByMe.get()) {
                     /* Race condition: Cancelled */
@@ -60,12 +60,10 @@ public class BroadcastingLock extends Lock {
                     return lockedByMe.get();
                 }
             }
-        }).next().then().doOnCancel(() -> {
+        }).next().then();
+        return LockHandle.from(request, () -> {
             synchronized (this) {
-                if (lockedByMe.getAndSet(true)) {
-                    /* Race condition: Lock just acquired */
-                    unlock();
-                }
+                return !lockedByMe.getAndSet(true);
             }
         });
     }

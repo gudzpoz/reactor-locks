@@ -18,17 +18,44 @@ package party.iroiro.lock;
 
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
 
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.TimeoutException;
 
 /**
  * An reactive interface for <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">
  * reader–writer locks</a>.
  */
 public abstract class RWLock extends Lock {
+    /**
+     * Offers more flexibility than {@link #tryRLock(Duration)}
+     *
+     * <p>
+     * See {@link LockHandle}
+     * </p>
+     *
+     * @return a lock handle
+     */
+    public abstract LockHandle tryRLock();
+
+    /**
+     * Tries to acquire the reader-lock, or stop and propagate a {@link TimeoutException}
+     * downstream after certain duration.
+     *
+     * @param duration the time to wait for lock
+     * @return a {@link Mono} that emits success when the lock is acquired
+     */
+    public Mono<Void> tryRLock(Duration duration) {
+        LockHandle lockHandle = tryRLock();
+        return lockHandle.mono().timeout(duration)
+                .onErrorResume(TimeoutException.class, e -> {
+                    if (lockHandle.cancel()) {
+                        return Mono.error(e);
+                    } else {
+                        return Mono.empty();
+                    }
+                });
+    }
 
     /**
      * See {@link Lock#lock} for details.
@@ -38,15 +65,16 @@ public abstract class RWLock extends Lock {
      * <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">Readers–writer lock</a>.
      * </p>
      * <p>
-     * The underlying implementation should handle the {@link SignalType#CANCEL} signal
-     * correctly, that is, you may use {@link Mono#timeout(Duration)},
-     * {@link Mono#timeout(Publisher)} safely. Timed-out locks need not unlocking,
-     * as is with {@link ReentrantLock#tryLock(long, TimeUnit)}.
+     * <b>Do not</b> use {@link Mono#timeout(Duration)} or {@link Mono#timeout(Publisher)},
+     * which are not handled at all. Use {@link #tryRLock(Duration)} or {@link #tryRLock()} instead
+     * if you want timeouts.
      * </p>
      *
      * @return a {@link Mono} that emits success when the lock is acquired
      */
-    public abstract Mono<Void> rLock();
+    public Mono<Void> rLock() {
+        return tryRLock().mono();
+    }
 
     /**
      * Checks whether this lock is reader-locked (or has reached the max lock holders)

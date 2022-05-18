@@ -20,7 +20,6 @@ class Example {
     <T> Mono<T> reactive(Mono<T> mono) {
         return mono
   /*  lock   */ .transform(lock::lockOnNext)
-  /* timeout */ .timeout(Duration.ofSeconds(10))
                 .doOnNext(this::someJob)
                 .map(t -> t.toString())
   /* unlock  */ .transform(lock::unlockOnNext);
@@ -60,10 +59,7 @@ implementation 'party.iroiro:reactor-locks:0.3.0'
 
 > You need to ensure every successful locking is followed by unlocking.
 
-> The locks handle `SignalType.CANCEL`, which means you can use `Mono::timeout` safely.
-> When the lock times out, do not try to unlock afterwards.
-> 
-> You will need to handle `TimeoutException`s yourself.
+> **Do not** attempt to use `lock.lock().timeout(...)`. Use `Lock::tryLock` instead.
 
 
 <table>

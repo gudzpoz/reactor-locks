@@ -20,7 +20,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.Consumer;
+import java.util.function.Function;
 
 abstract class SinkUtils {
     private SinkUtils() {}
@@ -33,11 +33,11 @@ abstract class SinkUtils {
      * @param onCancel the callback to register to {@link Mono#doOnCancel(Runnable)}, the created sink will be passed
      * @return the new {@link Mono}
      */
-    static Mono<Void> queue(ConcurrentLinkedQueue<Sinks.Empty<Void>> queue,
-                            Consumer<Sinks.Empty<Void>> onCancel) {
+    static LockHandle queue(ConcurrentLinkedQueue<Sinks.Empty<Void>> queue,
+                            Function<Sinks.Empty<Void>, Boolean> onCancel) {
         Sinks.Empty<Void> empty = Sinks.empty();
         queue.add(empty);
-        return empty.asMono().doOnCancel(() -> onCancel.accept(empty));
+        return LockHandle.from(empty.asMono(), () -> onCancel.apply(empty));
     }
 
     /**

@@ -16,7 +16,6 @@
 
 package party.iroiro.lock;
 
-import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -38,17 +37,14 @@ public class ReactiveSemaphore extends Lock {
     }
 
     @Override
-    public synchronized Mono<Void> lock() {
+    public synchronized LockHandle tryLock() {
         if (count < limit) {
             count++;
-            return Mono.empty();
+            return LockHandle.empty();
         } else {
             return SinkUtils.queue(queue, empty -> {
                 synchronized (this) {
-                    if (!empty.tryEmitEmpty().isSuccess()) {
-                        /* Race condition: Emitted by previous unlock */
-                        unlock();
-                    }
+                    return empty.tryEmitEmpty().isSuccess();
                 }
             });
         }
