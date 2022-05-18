@@ -1,9 +1,12 @@
 # Reactor Locks - Locks, RWLocks, Semaphores
 
-[![Build and Publish](https://github.com/gudzpoz/reactor-locks/actions/workflows/build.yml/badge.svg)](https://github.com/gudzpoz/reactor-locks/actions/workflows/build.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/party.iroiro/reactor-locks?color=blue&label=Maven%20Central)](https://mvnrepository.com/artifact/party.iroiro/reactor-locks)
 [![Javadoc](https://javadoc.io/badge2/party.iroiro/reactor-locks/Javadoc.svg?color=orange)](https://javadoc.io/doc/party.iroiro/reactor-locks)
 [![License](https://img.shields.io/github/license/gudzpoz/reactor-locks?label=License)](./LICENSE)
+
+[![Build and Publish](https://github.com/gudzpoz/reactor-locks/actions/workflows/build.yml/badge.svg)](https://github.com/gudzpoz/reactor-locks/actions/workflows/build.yml)
+[![Build and Publish](https://github.com/gudzpoz/reactor-locks/actions/workflows/test.yml/badge.svg)](https://github.com/gudzpoz/reactor-locks/actions/workflows/test.yml)
+[![Codecov](https://img.shields.io/codecov/c/github/gudzpoz/reactor-locks.svg?label=Coverage)]()
 
 Reactor Locks is a library providing reactive access to locks with [Project Reactor](https://projectreactor.io/).
 
@@ -36,7 +39,7 @@ class Example {
 <dependency>
   <groupId>party.iroiro</groupId>
   <artifactId>reactor-locks</artifactId>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
 </dependency>
 ```
 
@@ -46,7 +49,7 @@ class Example {
 <summary>Gradle</summary>
 
 ```groovy
-implementation 'party.iroiro:reactor-locks:0.2.0'
+implementation 'party.iroiro:reactor-locks:0.3.0'
 ```
 
 </details>
@@ -79,6 +82,15 @@ A `Mono<Void>` that emits success only after acquiring the lock.</td></tr>
 `RWLock::rUnlock()`</td><td>
 
 Returns `void` since you do not need to wait to unlock.</td></tr>
+<tr><td>
+
+`Lock::isLocked()`
+
+`RWLock::isRLocked()`</td><td>
+
+Whether the lock has been (either reader- or writer-) locked. For semaphores, it means whether the lock has reached the max lock holders. 
+
+**Never** rely on the result of this.</td></tr>
 </table>
 
 ### Wrapped Operators
@@ -176,6 +188,8 @@ return lockedMono
 - `ReactiveRWLock`
 
   A basic [readers-writer lock](https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock).
+  Handling writer hunger by blocking (reactively, of course) further readers
+  if there is a writer waiting.
 
 # License
 
