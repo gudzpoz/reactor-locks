@@ -3,6 +3,7 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'signing'
+    id 'jacoco'
 }
 
 group 'party.iroiro'
@@ -30,5 +31,6 @@ java {
     withJavadocJar()
 }
 
+apply from: 'jacoco.gradle'
 apply from: 'javadoc.gradle'
 apply from: 'publish.gradle'
