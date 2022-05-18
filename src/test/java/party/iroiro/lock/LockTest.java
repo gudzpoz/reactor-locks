@@ -129,6 +129,7 @@ public class LockTest {
         @Override
         protected void verifyFinally() {
             assertEquals(concurrency, set.size());
+            assertFalse(lock.isLocked());
         }
 
         @Override

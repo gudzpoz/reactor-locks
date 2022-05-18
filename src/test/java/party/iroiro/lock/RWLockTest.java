@@ -133,7 +133,10 @@ public class RWLockTest {
             if (isReader(i)) {
                 readers.incrementAndGet();
                 assertFalse(writing.get());
+                assertTrue(lock.isRLocked());
             } else {
+                assertTrue(lock.isLocked());
+                assertFalse(lock.isRLocked());
                 assertEquals(0, readers.get());
                 assertFalse(writing.getAndSet(true));
             }
