@@ -68,9 +68,23 @@ implementation 'party.iroiro:reactor-locks:0.3.0'
 
 `Lock::lock()`
 
-`RWLock::lock()`</td><td>
+`RWLock::rLock()`</td><td>
 
 A `Mono<Void>` that emits success only after acquiring the lock.</td></tr>
+<tr><td>
+
+`Lock::tryLock(Duration)`
+
+`RWLock::tryRLock(Duration)`</td><td>
+
+A `Mono<Void>` that emits success after acquiring the lock or emits `TimeoutException` if the specified duration is overdue.</td></tr>
+<tr><td>
+
+`Lock::tryLock()`
+
+`RWLock::tryRLock()`</td><td>
+
+A `LockHandle` which you may use to cancel the lock request any time you want to. Just make sure to check the return value of `cancel` in case that the lock is already granted.</td></tr>
 <tr><td>
 
 `Lock::unlock()`

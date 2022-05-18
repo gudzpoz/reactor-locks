@@ -31,9 +31,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * performance is comparable to {@link ReactiveLock} within ~100 concurrency, which
  * is still not that likely to get surmounted easily.
  * </p>
- * <p>
- * Also, handling {@link SignalType#CANCEL} also slows down a bit.
- * </p>
  */
 public class BroadcastingLock extends Lock {
     private final AtomicBoolean unlocked;

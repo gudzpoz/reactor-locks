@@ -68,7 +68,7 @@ public abstract class Lock {
      *     mono
      *         .flatMap(t -&gt; lock.<b>lock()</b>.thenReturn(t))
      *         /* Some processing &#42;/
-     *         .transform(lock::unlock)
+     *         .transform(lock::unlockOnNext)
      *         .block();
      * </code></pre>
      *
@@ -110,7 +110,7 @@ public abstract class Lock {
      *     mono
      *         .transform(lock::<b>lockOnNext</b>)
      *         /* Some processing &#42;/
-     *         .transform(lock::unlock)
+     *         .transform(lock::unlockOnNext)
      *         .block();
      * </code></pre>
      *
@@ -139,7 +139,7 @@ public abstract class Lock {
      * <pre><code>
      *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(lock::lock)
+     *         .transform(lock::lockOnNext)
      *         .flatMap(item -&gt; {
      *             /* Some processing &#42;/
      *             lock.<b>unlock</b>();
@@ -159,7 +159,7 @@ public abstract class Lock {
      * <pre><code>
      *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(lock::lock)
+     *         .transform(lock::lockOnNext)
      *         /* Some processing &#42;/
      *         .transform(lock::<b>unlockOnTerminate</b>)
      *         .block();
@@ -188,7 +188,7 @@ public abstract class Lock {
      * <pre><code>
      *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(lock::lock)
+     *         .transform(lock::lockOnNext)
      *         /* Some processing &#42;/
      *         .transform(lock::<b>unlockOnNext</b>)
      *         .block();
@@ -216,7 +216,7 @@ public abstract class Lock {
      * <pre><code>
      *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(lock::lock)
+     *         .transform(lock::lockOnNext)
      *         /* Some processing &#42;/
      *         .transform(lock::<b>unlockOnEmpty</b>)
      *         .block();
@@ -244,7 +244,7 @@ public abstract class Lock {
      * <pre><code>
      *     Lock lock = new ReactiveLock(); /* Or other locks &#42;/
      *     mono
-     *         .transform(lock::lock)
+     *         .transform(lock::lockOnNext)
      *         /* Some processing &#42;/
      *         .transform(lock::<b>unlockOnError</b>)
      *         .block();
