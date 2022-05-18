@@ -34,6 +34,7 @@ public class RWLockHungerTest {
                         .delayElement(Duration.ofSeconds(10))
                         .transform(lock::rUnlockOnNext)
         ).blockLast());
+        assertFalse(lock.isLocked());
     }
 
     @RepeatedTest(value = 50)
@@ -68,5 +69,6 @@ public class RWLockHungerTest {
         }
         assertEquals(readerCount + writerCount, Flux.merge(monos).count().block());
         assertEquals(readerCount + writerCount, set.size());
+        assertFalse(lock.isLocked());
     }
 }

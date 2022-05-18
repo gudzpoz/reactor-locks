@@ -19,6 +19,7 @@ package party.iroiro.lock;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.commons.annotation.Testable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
@@ -27,6 +28,7 @@ import reactor.util.annotation.Nullable;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.TimeoutException;
@@ -37,6 +39,46 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Testable
 public class LockTest {
+    @Test
+    public void lockedBroadcastingTest() {
+        BroadcastingLock lock = new BroadcastingLock();
+        assertFalse(lock.isLocked());
+        lock.lock().block();
+        assertTrue(lock.isLocked());
+        lock.unlock();
+        assertFalse(lock.isLocked());
+    }
+
+    @RepeatedTest(value = 1000)
+    public void raceBroadcastingTest() {
+        BroadcastingLock lock = new BroadcastingLock();
+        ArrayList<Mono<Integer>> monos = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) {
+            monos.add(lock.lock().timeout(Duration.ofNanos(10000))
+                    .thenReturn(0)
+                    .delayElement(Duration.ofNanos(10000))
+                    .transform(lock::unlockOnNext)
+                    .onErrorResume(TimeoutException.class, e -> Mono.just(-1)));
+        }
+        Flux.merge(monos).count().block();
+        assertFalse(lock.isLocked());
+    }
+
+    @RepeatedTest(value = 1000)
+    public void raceTest() {
+        Lock lock = new ReactiveLock();
+        ArrayList<Mono<Integer>> monos = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) {
+            monos.add(lock.lock().timeout(Duration.ofNanos(10000))
+                    .thenReturn(0)
+                    .delayElement(Duration.ofNanos(10000))
+                    .transform(lock::unlockOnNext)
+                    .onErrorResume(TimeoutException.class, e -> Mono.just(-1)));
+        }
+        Flux.merge(monos).count().block();
+        assertFalse(lock.isLocked());
+    }
+
     @Test
     public void sinkTest() {
         Sinks.Empty<Void> emitsBefore = Sinks.empty();
@@ -111,6 +153,7 @@ public class LockTest {
         Helper lockTester = new Helper(lock, concurrency,
                 () -> Duration.of(delay, ChronoUnit.MILLIS), scheduler);
         lockTester.verify().block();
+        assertFalse(lock.isLocked());
     }
 
     static class Helper extends LockTestHelper<Lock> {
@@ -153,10 +196,13 @@ public class LockTest {
         @Override
         Mono<Integer> unlock(Mono<Integer> integerMono) {
             return integerMono
+
                     .transform(lock::unlockOnNext)
                     .doOnNext(i -> assertNotEquals(9, i % 10))
-                    .doOnError(SomeException.class, e -> assertEquals(9, e.getI() % 10))
+
                     .onErrorResume(TimeoutException.class, e -> Mono.just(-1))
+
+                    .doOnError(SomeException.class, e -> assertEquals(9, e.getI() % 10))
                     .transform(lock::unlockOnError);
         }
 

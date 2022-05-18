@@ -22,7 +22,9 @@ import reactor.core.publisher.Sinks;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 
-class SinkUtils {
+abstract class SinkUtils {
+    private SinkUtils() {}
+
     /**
      * Creates a {@link Sinks.Empty}, offer it to the queue, and make a {@link Mono}
      * which emits success after the sink is filled.

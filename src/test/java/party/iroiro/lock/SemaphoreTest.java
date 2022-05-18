@@ -17,6 +17,7 @@
 package party.iroiro.lock;
 
 import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -33,6 +34,15 @@ import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SemaphoreTest {
+    @Test
+    public void lockedTest() {
+        ReactiveSemaphore semaphore = new ReactiveSemaphore(2);
+        semaphore.lock().block();
+        assertFalse(semaphore.isLocked());
+        semaphore.lock().block();
+        assertTrue(semaphore.isLocked());
+    }
+
     @RepeatedTest(value = 1000)
     public void semaphoreTest() {
         semaphoreTest(2, 1, 0, null);
@@ -49,9 +59,11 @@ public class SemaphoreTest {
 
     private void semaphoreTest(int count, int limit, int delay,
                                @Nullable Scheduler scheduler) {
-        Helper helper = new Helper(new ReactiveSemaphore(limit), count, () ->
+        ReactiveSemaphore semaphore = new ReactiveSemaphore(limit);
+        Helper helper = new Helper(semaphore, count, () ->
                 Duration.of(delay, ChronoUnit.MILLIS), limit, scheduler);
         helper.verify().block();
+        assertFalse(semaphore.isLocked());
     }
 
     static class Helper extends LockTestHelper<Lock> {

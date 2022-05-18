@@ -5,7 +5,6 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 abstract class LockTestHelper<T extends Lock> {
     protected final T lock;
@@ -18,15 +17,13 @@ abstract class LockTestHelper<T extends Lock> {
     }
 
     public Mono<Void> verify() {
-        return eagerSequence().then().doFinally(ignored -> this.verifyFinally());
+        return eagerSequence().count().doFinally(ignored -> this.verifyFinally()).then();
     }
 
     protected abstract void verifyFinally();
 
     private Flux<Integer> eagerSequence() {
-        return Flux.range(0, concurrency).collectList().flatMapMany(
-                list -> Flux.merge(list.stream().map(this::toMono).collect(Collectors.toList()))
-        );
+        return Flux.range(0, concurrency).map(this::toMono).collectList().flatMapMany(Flux::merge);
     }
 
     private Mono<Integer> toMono(Integer integer) {

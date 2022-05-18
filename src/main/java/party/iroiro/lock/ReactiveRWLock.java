@@ -66,7 +66,7 @@ public class ReactiveRWLock extends RWLock {
 
     public synchronized void unlock() {
         if (SinkUtils.emitAndCheckShouldUnlock(writers)) {
-            if (readers.isEmpty() && readerCount == 0) {
+            if (readers.isEmpty()) {
                 state = State.NONE;
             } else {
                 startReaders();
@@ -102,6 +102,8 @@ public class ReactiveRWLock extends RWLock {
                 }
                 /* Fall through */
             case WRITING:
+                /* default: For full coverage */
+            default:
                 return SinkUtils.queue(readers, empty -> {
                     synchronized (this) {
                         if (empty.tryEmitEmpty().isSuccess()) {
@@ -110,8 +112,6 @@ public class ReactiveRWLock extends RWLock {
                         rUnlock();
                     }
                 });
-            default:
-                return Mono.never();
         }
     }
 
