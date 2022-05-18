@@ -23,6 +23,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * An implementation {@link RWLock}. See the Javadoc of {@link RWLock} for details.
+ *
+ * <p>
+ * This implementation handles writer hunger. A waiting writer should block (in reactive
+ * ways of course) further readers from acquiring the lock.
+ * </p>
  */
 public class ReactiveRWLock extends RWLock {
     private final ConcurrentLinkedQueue<Sinks.Empty<Void>> readers;

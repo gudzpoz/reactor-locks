@@ -23,6 +23,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.annotation.Nullable;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -70,7 +71,7 @@ public class RWLockTest {
         ).blockLast();
     }
 
-    private void rwLockTest(int count, int delay, Scheduler scheduler) {
+    private void rwLockTest(int count, int delay, @Nullable Scheduler scheduler) {
         ReactiveRWLock rw = new ReactiveRWLock();
         Helper helper = new Helper(rw, count,
                 () -> Duration.of(delay, ChronoUnit.MICROS), scheduler);
@@ -83,7 +84,8 @@ public class RWLockTest {
         final AtomicInteger readers;
         private final Scheduler scheduler;
 
-        Helper(RWLock lock, int concurrency, Supplier<Duration> delay, Scheduler scheduler) {
+        Helper(RWLock lock, int concurrency, Supplier<Duration> delay,
+               @Nullable Scheduler scheduler) {
             super(lock, concurrency, delay);
             this.scheduler = scheduler;
             set = new ConcurrentSkipListSet<>();

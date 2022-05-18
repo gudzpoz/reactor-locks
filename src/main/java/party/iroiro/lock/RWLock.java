@@ -16,7 +16,13 @@
 
 package party.iroiro.lock;
 
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
+
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * An reactive interface for <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">
@@ -24,13 +30,18 @@ import reactor.core.publisher.Mono;
  */
 public abstract class RWLock extends Lock {
 
-
     /**
      * See {@link Lock#lock} for details.
      *
      * <p>
      * The difference is that the underlying implementation might choose to implement a
      * <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">Readers–writer lock</a>.
+     * </p>
+     * <p>
+     * The underlying implementation should handle the {@link SignalType#CANCEL} signal
+     * correctly, that is, you may use {@link Mono#timeout(Duration)},
+     * {@link Mono#timeout(Publisher)} safely. Timed-out locks need not unlocking,
+     * as is with {@link ReentrantLock#tryLock(long, TimeUnit)}.
      * </p>
      *
      * @return a {@link Mono} that emits success when the lock is acquired

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.RepeatedTest;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.annotation.Nullable;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -32,7 +33,7 @@ import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SemaphoreTest {
-    @RepeatedTest(value = 5000)
+    @RepeatedTest(value = 1000)
     public void semaphoreTest() {
         semaphoreTest(2, 1, 0, null);
         semaphoreTest(2, 1, 1, null);
@@ -46,7 +47,8 @@ public class SemaphoreTest {
         semaphoreTest(100, 20, 10, Schedulers.parallel());
     }
 
-    private void semaphoreTest(int count, int limit, int delay, Scheduler scheduler) {
+    private void semaphoreTest(int count, int limit, int delay,
+                               @Nullable Scheduler scheduler) {
         Helper helper = new Helper(new ReactiveSemaphore(limit), count, () ->
                 Duration.of(delay, ChronoUnit.MILLIS), limit, scheduler);
         helper.verify().block();
@@ -58,7 +60,8 @@ public class SemaphoreTest {
         private final int limit;
         private final Scheduler scheduler;
 
-        Helper(Lock lock, int concurrency, Supplier<Duration> delay, int limit, Scheduler scheduler) {
+        Helper(Lock lock, int concurrency, Supplier<Duration> delay, int limit,
+               @Nullable Scheduler scheduler) {
             super(lock, concurrency, delay);
             this.limit = limit;
             this.scheduler = scheduler;
