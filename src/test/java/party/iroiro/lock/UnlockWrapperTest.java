@@ -13,7 +13,7 @@ import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class UnlockWrapperTest {
-    @RepeatedTest(value = 1)
+    @RepeatedTest(value = 3)
     public void rwWrapperTest() {
         ArrayList<Function<Integer, Job>> shouldDos = new ArrayList<>();
         shouldDos.add(this::shouldDoSome);

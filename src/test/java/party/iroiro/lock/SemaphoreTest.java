@@ -101,7 +101,7 @@ public class SemaphoreTest {
             Duration duration = delay.get().multipliedBy(concurrency / 2);
             return duration.isZero()
                     ? integerMono.transform(lock::lockOnNext)
-                    : integerMono.flatMap(i -> lock.lockOnNext(Mono.just(i)).timeout(duration)
+                    : integerMono.flatMap(i -> lock.tryLock(duration).thenReturn(i)
                     .doOnError(e -> assertTrue(set.add(i))));
         }
 

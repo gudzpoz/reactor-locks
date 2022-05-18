@@ -54,7 +54,7 @@ public class LockTest {
         BroadcastingLock lock = new BroadcastingLock();
         ArrayList<Mono<Integer>> monos = new ArrayList<>();
         for (int i = 0; i < 1000; i++) {
-            monos.add(lock.lock().timeout(Duration.ofNanos(10000))
+            monos.add(lock.tryLock(Duration.ofNanos(10000))
                     .thenReturn(0)
                     .delayElement(Duration.ofNanos(10000))
                     .transform(lock::unlockOnNext)
@@ -69,7 +69,7 @@ public class LockTest {
         Lock lock = new ReactiveLock();
         ArrayList<Mono<Integer>> monos = new ArrayList<>();
         for (int i = 0; i < 1000; i++) {
-            monos.add(lock.lock().timeout(Duration.ofNanos(10000))
+            monos.add(lock.tryLock(Duration.ofNanos(10000))
                     .thenReturn(0)
                     .delayElement(Duration.ofNanos(10000))
                     .transform(lock::unlockOnNext)
@@ -116,24 +116,24 @@ public class LockTest {
         lockTest(new BroadcastingLock(), 100, 0, Schedulers.parallel());
     }
 
-    @RepeatedTest(value = 10000)
+    @RepeatedTest(value = 3000)
     public void lockTestPairConcurrency() {
         lockTest(new ReactiveLock(), 2, 0, null);
         lockTest(new ReactiveLock(), 2, 1, Schedulers.parallel());
     }
 
-    @RepeatedTest(value = 10000)
+    @RepeatedTest(value = 3000)
     public void broadcastingLockTestPairConcurrency() {
         lockTest(new BroadcastingLock(), 2, 0, null);
         lockTest(new BroadcastingLock(), 2, 1, Schedulers.parallel());
     }
 
-    @RepeatedTest(value = 3000)
+    @RepeatedTest(value = 1000)
     public void largeAudienceTest() {
         lockTest(new ReactiveLock(), 500, 0, Schedulers.parallel());
     }
 
-    @RepeatedTest(value = 3000)
+    @RepeatedTest(value = 1000)
     public void largeAudienceBroadcastTest() {
         lockTest(new BroadcastingLock(), 500, 0, Schedulers.parallel());
     }
@@ -189,7 +189,7 @@ public class LockTest {
             Duration duration = delay.get().multipliedBy(concurrency / 2);
             return duration.isZero()
                     ? integerMono.transform(lock::lockOnNext)
-                    : integerMono.flatMap(i -> lock.lockOnNext(Mono.just(i)).timeout(duration)
+                    : integerMono.flatMap(i -> lock.tryLock(duration).thenReturn(i)
                             .doOnError(e -> assertTrue(set.add(i))));
         }
 

@@ -143,8 +143,7 @@ public class RWLockTest {
         Mono<Integer> lock(Mono<Integer> integerMono) {
             return integerMono.flatMap(t -> {
                 Duration duration = delay.get().multipliedBy(concurrency / 2);
-                return (isReader(t) ? lock.rLock() : lock.lock()).thenReturn(t)
-                        .timeout(duration)
+                return (isReader(t) ? lock.tryRLock(duration) : lock.tryLock(duration)).thenReturn(t)
                         .doOnError(TimeoutException.class, e -> assertTrue(set.add(t)));
             });
         }

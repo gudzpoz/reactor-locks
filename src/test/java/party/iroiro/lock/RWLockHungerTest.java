@@ -18,23 +18,29 @@ public class RWLockHungerTest {
     public void simpleTest() {
         RWLock lock = new ReactiveRWLock();
         assertDoesNotThrow(() -> Flux.merge(
-                Mono.just(0)
+                Mono.just(0) // First
                         .transform(lock::rLockOnNext)
                         .delayElement(Duration.ofSeconds(3))
                         .transform(lock::rUnlockOnNext),
-                Mono.just(1)
+                Mono.just(1) // Writer prioritized: Second
                         .delayElement(Duration.ofSeconds(1))
-                        .transform(lock::lockOnNext)
-                        .timeout(Duration.ofSeconds(5))
+                        .flatMap(t -> lock.tryLock(Duration.ofSeconds(5)).thenReturn(t))
                         .delayElement(Duration.ofSeconds(3))
                         .transform(lock::unlockOnNext),
-                Mono.just(2)
+                Mono.just(2) // Third
                         .delayElement(Duration.ofSeconds(2))
                         .transform(lock::rLockOnNext)
                         .delayElement(Duration.ofSeconds(10))
                         .transform(lock::rUnlockOnNext)
         ).blockLast());
         assertFalse(lock.isLocked());
+    }
+
+    @Test
+    public void timeoutTest() {
+        RWLock lock = new ReactiveRWLock();
+        lock.rLock().block();
+        assertThrows(Exception.class, () -> lock.tryLock(Duration.ofMillis(100)).block());
     }
 
     @RepeatedTest(value = 50)
@@ -56,12 +62,13 @@ public class RWLockHungerTest {
             );
         }
         for (int i = 0; i < writerCount; i++) {
+            int finalI = i;
             monos.add(
                     Mono.just(i)
                             .publishOn(Schedulers.parallel())
                             .delayElement(Duration.ofMillis(i + readerCount / 2))
-                            .transform(lock::lockOnNext)
-                            .timeout(Duration.ofMillis(i + 3 * readerCount / 2))
+                            .flatMap(t -> lock.tryRLock(
+                                    Duration.ofMillis(finalI + 3 * readerCount / 2)).thenReturn(t))
                             .delayElement(Duration.ofMillis(1))
                             .filter(set::add)
                             .transform(lock::unlockOnNext)
