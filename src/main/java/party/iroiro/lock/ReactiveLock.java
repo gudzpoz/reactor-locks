@@ -32,12 +32,14 @@ public class ReactiveLock extends AbstractLock {
         locked = false;
     }
 
+    @Override
     public synchronized void unlock() {
         if (SinkUtils.emitAndCheckShouldUnlock(queue)) {
             locked = false;
         }
     }
 
+    @Override
     public synchronized LockHandle tryLock() {
         if (locked) {
             return SinkUtils.queue(queue, (empty) -> {
