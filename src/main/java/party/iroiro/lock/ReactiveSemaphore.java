@@ -42,11 +42,7 @@ public class ReactiveSemaphore extends AbstractLock {
             count++;
             return LockHandle.empty();
         } else {
-            return SinkUtils.queue(queue, empty -> {
-                synchronized (this) {
-                    return empty.tryEmitEmpty().isSuccess();
-                }
-            });
+            return SinkUtils.queue(queue, empty -> empty.tryEmitEmpty().isSuccess());
         }
     }
 
@@ -55,9 +51,19 @@ public class ReactiveSemaphore extends AbstractLock {
         return count >= limit;
     }
 
-    public synchronized void unlock() {
-        if (SinkUtils.emitAndCheckShouldUnlock(queue)) {
-            count--;
+    public void unlock() {
+        Sinks.Empty<Void> sink;
+        while (true) {
+            synchronized (this) {
+                sink = queue.poll();
+                if (sink == null) {
+                    count--;
+                    return;
+                }
+            }
+            if (sink.tryEmitEmpty().isSuccess()) {
+                return;
+            }
         }
     }
 }

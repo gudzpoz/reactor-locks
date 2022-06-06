@@ -111,6 +111,12 @@ public class LockTest {
     }
 
     @RepeatedTest(value = 1000)
+    public void rwLockTestHundredConcurrency() {
+        lockTest(new ReactiveRWLock(), 100, 0, null);
+        lockTest(new ReactiveRWLock(), 100, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 1000)
     public void broadcastingLockTestHundredConcurrency() {
         lockTest(new BroadcastingLock(), 100, 0, null);
         lockTest(new BroadcastingLock(), 100, 0, Schedulers.parallel());

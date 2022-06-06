@@ -39,26 +39,4 @@ abstract class SinkUtils {
         queue.add(empty);
         return LockHandle.from(empty.asMono(), () -> onCancel.apply(empty));
     }
-
-    /**
-     * Poll from the queue, emit to the polled item, until the emission is successful or the queue empty
-     *
-     * <p>
-     * External synchronization is almost <b>required</b>. Use with caution.
-     * </p>
-     *
-     * @param queue the queue to poll from
-     * @return <code>false</code> if the emission is successful and the lock need not be removed<br>
-     *         <code>true</code> if the emission failed and the lock can now be removed
-     */
-    static boolean emitAndCheckShouldUnlock(ConcurrentLinkedQueue<Sinks.Empty<Void>> queue) {
-        Sinks.Empty<Void> sink = queue.poll();
-        while (sink != null) {
-            if (sink.tryEmitEmpty().isSuccess()) {
-                return false;
-            }
-            sink = queue.poll();
-        }
-        return true;
-    }
 }

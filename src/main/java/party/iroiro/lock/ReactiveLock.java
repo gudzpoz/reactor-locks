@@ -33,20 +33,26 @@ public class ReactiveLock extends AbstractLock {
     }
 
     @Override
-    public synchronized void unlock() {
-        if (SinkUtils.emitAndCheckShouldUnlock(queue)) {
-            locked = false;
+    public void unlock() {
+        Sinks.Empty<Void> sink;
+        while (true) {
+            synchronized (this) {
+                sink = queue.poll();
+                if (sink == null) {
+                    locked = false;
+                    return;
+                }
+            }
+            if (sink.tryEmitEmpty().isSuccess()) {
+                return;
+            }
         }
     }
 
     @Override
     public synchronized LockHandle tryLock() {
         if (locked) {
-            return SinkUtils.queue(queue, (empty) -> {
-                synchronized (this) {
-                    return empty.tryEmitEmpty().isSuccess();
-                }
-            });
+            return SinkUtils.queue(queue, (empty) -> empty.tryEmitEmpty().isSuccess());
         } else {
             locked = true;
             return LockHandle.empty();
