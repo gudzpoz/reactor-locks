@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * An implementation of {@link Lock} by internally broadcasting releasing events.
  *
  * <p>
- * Since it is broadcasting, it get slower as the concurrency increases. But its
+ * Since it is broadcasting, it gets slower as the concurrency increases. But its
  * performance is comparable to {@link ReactiveLock} within ~100 concurrency, which
  * is still not that likely to get surmounted easily.
  * </p>
@@ -47,7 +47,7 @@ public class BroadcastingLock extends AbstractLock {
     public LockHandle tryLock() {
         final AtomicBoolean lockedByMe = new AtomicBoolean(false);
         Mono<Void> request = queue.filter(ignored -> {
-            synchronized (this) {
+            synchronized (lockedByMe) {
                 if (lockedByMe.get()) {
                     /* Race condition: Cancelled */
                     return false;
@@ -58,20 +58,27 @@ public class BroadcastingLock extends AbstractLock {
             }
         }).next().then();
         return LockHandle.from(request, () -> {
-            synchronized (this) {
+            synchronized (lockedByMe) {
                 return !lockedByMe.getAndSet(true);
             }
         });
     }
 
     @Override
-    public synchronized boolean isLocked() {
+    public boolean isLocked() {
         return !unlocked.get();
     }
 
     @Override
-    public synchronized void unlock() {
+    public void unlock() {
         unlocked.set(true);
-        broadcast.tryEmitNext(true);
+        //noinspection StatementWithEmptyBody
+        while (broadcast.tryEmitNext(true) == Sinks.EmitResult.FAIL_NON_SERIALIZED) {
+            /*
+             * Race condition: Multiple unlocks:
+             * The lock is acquired and unlocked after we set `unlocked` but before we emit
+             * the signal, resulting in concurrent `tryEmitNext` and thus FAIL_NON_SERIALIZED.
+             */
+        }
     }
 }

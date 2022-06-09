@@ -129,6 +129,12 @@ public class LockTest {
     }
 
     @RepeatedTest(value = 3000)
+    public void rwLockTestPairConcurrency() {
+        lockTest(new ReactiveRWLock(), 2, 0, null);
+        lockTest(new ReactiveRWLock(), 2, 1, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 3000)
     public void broadcastingLockTestPairConcurrency() {
         lockTest(new BroadcastingLock(), 2, 0, null);
         lockTest(new BroadcastingLock(), 2, 1, Schedulers.parallel());
@@ -140,6 +146,11 @@ public class LockTest {
     }
 
     @RepeatedTest(value = 1000)
+    public void largeAudienceRwTest() {
+        lockTest(new ReactiveRWLock(), 500, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 1000)
     public void largeAudienceBroadcastTest() {
         lockTest(new BroadcastingLock(), 500, 0, Schedulers.parallel());
     }
@@ -147,6 +158,11 @@ public class LockTest {
     @RepeatedTest(value = 100)
     public void timeoutTest() {
         lockTest(new ReactiveLock(), 50, 10, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 100)
+    public void timeoutRwTest() {
+        lockTest(new ReactiveRWLock(), 50, 10, Schedulers.parallel());
     }
 
     @RepeatedTest(value = 100)
