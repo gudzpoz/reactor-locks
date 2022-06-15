@@ -19,7 +19,7 @@ repositories {
 dependencies {
     api 'io.projectreactor:reactor-core:3.4.18'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
-    implementation 'io.projectreactor:reactor-test:3.4.18'
+    implementation 'io.projectreactor:reactor-test:3.4.19'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.2'
 }
 
