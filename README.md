@@ -19,10 +19,10 @@ class Example {
     
     <T> Mono<T> reactive(Mono<T> mono) {
         return mono
-  /*  lock   */ .transform(lock::lockOnNext)
-                .doOnNext(this::someJob)
-                .map(t -> t.toString())
-  /* unlock  */ .transform(lock::unlockOnNext);
+                .as(Lock::begin)
+                .flatMap(t -> someJob(t))
+                .map(t -> someOtherJob(t))
+                .with(lock);
     }
 }
 ```
@@ -38,7 +38,7 @@ class Example {
 <dependency>
   <groupId>party.iroiro</groupId>
   <artifactId>reactor-locks</artifactId>
-  <version>0.4.0</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
@@ -48,43 +48,73 @@ class Example {
 <summary>Gradle</summary>
 
 ```groovy
-implementation 'party.iroiro:reactor-locks:0.4.0'
+implementation 'party.iroiro:reactor-locks:1.0.0'
 ```
 
 </details>
 
 ## Usage
 
-### Basic
+### Fluent API
 
-> You need to ensure every successful locking is followed by unlocking.
+```java
+import party.iroiro.lock.Lock;
 
-> **Do not** attempt to use `lock.lock().timeout(...)`. Use `Lock::tryLock` instead.
+// ...
 
+Lock lock = getLock();
+// (1)    Start a locked scope builder
+   mono.as(Lock::begin)
+
+//    (2) Register operations in the locked scope
+//    (2) Operations inside will be performed with the lock locked
+      .map(t -> t + 1)
+      .flatMap(this::fm)
+
+// (3)   Build the locked scope with a lock
+    .with(lock);
+```
+
+For `RWLock`s, you may choose between `.with` and `.withR` to distinguish reader-locking and writer-locking.
+
+### Scoped Function
+
+A little lengthy.
+
+```java
+mono.flatMap(t -> lock.withLock(() -> {
+    return Mono.just(t)
+               .map(t -> t + 1)
+               .flatMap(this::fm);
+});
+```
+
+For `RWLocks`s, `.withLock` or `.withRLock`.
+
+### Advanced
+
+The APIs below utilize `LockHandle` ([Javadoc](https://javadoc.io/doc/party.iroiro/reactor-locks/latest/index.html)):
+
+```java
+public interface LockHandle {
+    Mono<Void> mono();
+    boolean cancel();
+}
+```
+
+Subscribe to `mono()` to get informed when the lock is ready. Or you may cancel the request. In case of a failed cancellation (`false` returned), you need to `unlock` the lock yourself. 
 
 <table>
 <tr><th>Function</th><th>Returns</th></tr>
 <tr><td>
 
-`Lock::lock()`
-
-`RWLock::rLock()`</td><td>
-
-A `Mono<Void>` that emits success only after acquiring the lock.</td></tr>
-<tr><td>
-
-`Lock::tryLock(Duration)`
-
-`RWLock::tryRLock(Duration)`</td><td>
-
-A `Mono<Void>` that emits success after acquiring the lock or emits `TimeoutException` if the specified duration is overdue.</td></tr>
-<tr><td>
-
 `Lock::tryLock()`
 
-`RWLock::tryRLock()`</td><td>
+`RWLock::tryRLock()`
 
-A `LockHandle` which you may use to cancel the lock request any time you want to. Just make sure to check the return value of `cancel` in case that the lock is already granted.</td></tr>
+Immediately requests the lock. Use it with `Mono.defer` if you want laziness.</td><td>
+
+A `LockHandle` which you may use to cancel the lock request any time you want to. Just make sure to check the return value of `cancel` in case that the lock is already granted (which means you need to `unlock` it yourself.</td></tr>
 <tr><td>
 
 `Lock::unlock()`
@@ -105,77 +135,9 @@ Whether the lock has been (either reader- or writer-) locked. For semaphores, it
 
 ### Wrapped Operators
 
-<table>
-<tr><th>Operator</th><th>Example</th></tr>
-<tr><td>
+In previous version of this library, we have `lockOnNext` `unlockOnNext` to make locking easier. However, all these operators does not handle Mono cancellations (from downstream `timeout` for example) and we are deprecating them.
 
-`Lock::lockOnNext`
-
-`RWLock::rLockOnNext`</td><td>
-
-```java
-return mono
-      .transform(lock::lockOnNext)
-      .doOnNext(t -> log.info("Lock Acquired"));
-```
-</td>
-</tr>
-<tr><td>
-
-`Lock::unlockOnNext`
-
-`RWLock::rUnlockOnNext`</td><td>
-
-```java
-return lockedMono
-      .transform(lock::unlockOnNext)
-      .doOnNext(t -> log.info("Lock Released"));
-```
-</td>
-</tr>
-<tr><td>
-
-`Lock::unlockOnEmpty`
-
-`RWLock::rUnlockOnEmpty`</td><td>
-
-```java
-return lockedMono
-      .transform(lock::unlockOnEmpty)
-      .switchIfEmpty(Mono.fromRunnable(() ->
-              log.info("Lock released");
-      );
-```
-</td>
-</tr>
-<tr><td>
-
-`Lock::unlockOnError`
-
-`RWLock::rUnlockOnError`</td><td>
-
-```java
-return lockedMono
-      .flatMap(ignored -> Mono.error(new Exception()))
-      .transform(lock::unlockOnError)
-      .doOnError(t -> log.info("Lock Released"));
-```
-</td>
-</tr>
-<tr><td>
-
-`Lock::unlockOnTerminate`
-
-`RWLock::rUnlockOnTerminate`</td><td>
-
-```java
-return lockedMono
-      .transform(lock::unlockOnTerminate)
-      .doOnTerminate(t -> log.info("Lock Release"));
-```
-</td>
-</tr>
-</table>
+Use the fluent API or `withLock` / `withRLock` instead.
 
 ## Locks
 
