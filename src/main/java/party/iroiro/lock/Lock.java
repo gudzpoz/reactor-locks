@@ -5,8 +5,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -14,10 +16,18 @@ import java.util.function.Supplier;
  */
 public interface Lock {
     /**
-     * Offers more flexibility than {@link #tryLock(Duration)}
+     * Immediately requests to hold the lock.
      *
      * <p>
-     * See {@link LockHandle}
+     * See {@link LockHandle}. Subscribe to {@link LockHandle#mono()} to get informed
+     * when the lock becomes available.
+     * </p>
+     * <p>
+     * To properly unlock, you are suggested to handle all cases including completing
+     * without error, failing with errors or the whole {@link Mono} or {@link Flux} getting
+     * cancelled. You might want to use {@link #withLock(Supplier)} to save yourself from
+     * the boilerplate, which internally uses {@link Flux#using(Callable, Function, Consumer)}
+     * to {@link LockHandle#cancel()} or {@link #unlock()} accordingly.
      * </p>
      *
      * @return a lock handle
@@ -28,10 +38,9 @@ public interface Lock {
      * Tries to acquire the lock, or stop and propagate a {@link TimeoutException} downstream after
      * certain duration.
      *
-     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
-     *
      * @param duration the time to wait for lock
      * @return a {@link Mono} that emits success when the lock is acquired
+     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      */
     @Deprecated
     Mono<Void> tryLock(Duration duration);
@@ -39,6 +48,7 @@ public interface Lock {
     /**
      * Get a {@link Mono} that emits success only after acquiring the lock
      *
+     * @return a {@link Mono} that emits success when the lock is acquired
      * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
@@ -62,8 +72,6 @@ public interface Lock {
      * which are not handled at all. Use {@link #tryLock(Duration)} or {@link #tryLock()} instead
      * if you want timeouts.
      * </p>
-     *
-     * @return a {@link Mono} that emits success when the lock is acquired
      */
     @Deprecated
     Mono<Void> lock();
@@ -78,6 +86,7 @@ public interface Lock {
      *
      * @param scoped a {@link Publisher} supplier to be run with the lock held
      * @return a {@link Flux} containing values produces by the {@link Publisher} returned by the function
+     * @param <T> the flowing data type
      */
     <T> Flux<T> withLock(Supplier<Publisher<T>> scoped);
 
@@ -95,6 +104,9 @@ public interface Lock {
     /**
      * Try to acquire the lock on the next element before propagating
      *
+     * @param mono the {@link Mono}, of which the next value will require locking to propagate
+     * @param <T>  the generic type of {@link Mono}
+     * @return the transformed {@link Mono}
      * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
@@ -116,10 +128,6 @@ public interface Lock {
      * <p>
      * When the lock becomes available, the value will be automatically propagated downstream.
      * </p>
-     *
-     * @param mono the {@link Mono}, of which the next value will require locking to propagate
-     * @param <T>  the generic type of {@link Mono}
-     * @return the transformed {@link Mono}
      */
     @Deprecated
     <T> Mono<T> lockOnNext(Mono<T> mono);
@@ -147,6 +155,9 @@ public interface Lock {
     /**
      * Release the lock with {@link Mono#doOnTerminate(Runnable)} before propagating
      *
+     * @param mono the {@link Mono}, of which the termination signal will require unlocking to propagate
+     * @param <T>  the generic type of {@link Mono}
+     * @return the transformed {@link Mono}
      * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
@@ -166,10 +177,6 @@ public interface Lock {
      * all cases, including an empty {@link Mono}, a successful {@link Mono} with a
      * emitted value or {@link Mono}s with an error.
      * </p>
-     *
-     * @param mono the {@link Mono}, of which the termination signal will require unlocking to propagate
-     * @param <T>  the generic type of {@link Mono}
-     * @return the transformed {@link Mono}
      */
     @Deprecated
     <T> Mono<T> unlockOnTerminate(Mono<T> mono);
@@ -177,6 +184,9 @@ public interface Lock {
     /**
      * Release the lock with {@link Mono#doOnNext(Consumer)} before propagating
      *
+     * @param mono the {@link Mono}, of which the next value will require unlocking to propagate
+     * @param <T>  the generic type of {@link Mono}
+     * @return the transformed {@link Mono}
      * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
@@ -195,10 +205,6 @@ public interface Lock {
      * Using {@link Mono#doOnNext(Consumer)} to ensure the execution order and handling of
      * a successful {@link Mono} with a emitted value.
      * </p>
-     *
-     * @param mono the {@link Mono}, of which the next value will require unlocking to propagate
-     * @param <T>  the generic type of {@link Mono}
-     * @return the transformed {@link Mono}
      */
     @Deprecated
     <T> Mono<T> unlockOnNext(Mono<T> mono);
@@ -206,6 +212,9 @@ public interface Lock {
     /**
      * Release the lock with {@link Mono#switchIfEmpty(Mono)}
      *
+     * @param mono the {@link Mono}, of which the signal, when Mono is empty, will require unlocking to propagate
+     * @param <T>  the generic type of {@link Mono}
+     * @return the transformed {@link Mono}
      * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
@@ -224,10 +233,6 @@ public interface Lock {
      * Using {@link Mono#switchIfEmpty(Mono)} to ensure the execution order and handling of
      * an empty {@link Mono}.
      * </p>
-     *
-     * @param mono the {@link Mono}, of which the signal, when Mono is empty, will require unlocking to propagate
-     * @param <T>  the generic type of {@link Mono}
-     * @return the transformed {@link Mono}
      */
     @Deprecated
     <T> Mono<T> unlockOnEmpty(Mono<T> mono);
@@ -235,6 +240,9 @@ public interface Lock {
     /**
      * Release the lock with {@link Mono#doOnError(Consumer)} before propagating
      *
+     * @param mono the {@link Mono}, of which the next error will require unlocking to propagate
+     * @param <T>  the generic type of {@link Mono}
+     * @return the transformed {@link Mono}
      * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
@@ -253,10 +261,6 @@ public interface Lock {
      * Using {@link Mono#doOnError(Consumer)} to ensure the execution order and handling of
      * {@link Mono}s with an error.
      * </p>
-     *
-     * @param mono the {@link Mono}, of which the next error will require unlocking to propagate
-     * @param <T>  the generic type of {@link Mono}
-     * @return the transformed {@link Mono}
      */
     @Deprecated
     <T> Mono<T> unlockOnError(Mono<T> mono);

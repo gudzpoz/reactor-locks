@@ -9,15 +9,15 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 /**
- * An reactive interface for <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">
+ * A reactive interface for <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">
  * reader–writer locks</a>.
  */
 public interface RWLock extends Lock {
     /**
-     * Offers more flexibility than {@link #tryRLock(Duration)}
+     * The reader lock equivalent to {@link #tryLock()}
      *
      * <p>
-     * See {@link LockHandle}
+     * See {@link LockHandle} and {@link #tryLock()}
      * </p>
      *
      * @return a lock handle
@@ -41,6 +41,7 @@ public interface RWLock extends Lock {
      *
      * @param scoped the function to get executed with the lock held
      * @return a {@link Flux} containing values produces by the {@link Publisher} returned by the function
+     * @param <T> the flowing data type
      */
     <T> Flux<T> withRLock(Supplier<Publisher<T>> scoped);
 
@@ -76,7 +77,7 @@ public interface RWLock extends Lock {
     boolean isRLocked();
 
     /**
-     * See {@link AbstractLock#lockOnNext(Mono)} for details.
+     * Tries to acquire the reader lock on the next element before propagating
      *
      * @deprecated Use {@link #withRLock(Supplier)} to handle cancelling signals
      *
