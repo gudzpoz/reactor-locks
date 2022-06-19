@@ -16,10 +16,13 @@
 
 package party.iroiro.lock;
 
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 abstract class AbstractRWLock extends AbstractLock implements RWLock {
 
@@ -34,6 +37,15 @@ abstract class AbstractRWLock extends AbstractLock implements RWLock {
                         return Mono.empty();
                     }
                 });
+    }
+
+    @Override
+    public <T> Flux<T> withRLock(Supplier<Publisher<T>> scoped) {
+        return Flux.using(
+                this::tryRLock,
+                lockHandle -> lockHandle.mono().thenMany(Flux.defer(scoped)),
+                lockHandle -> { if (!lockHandle.cancel()) { rUnlock(); } }
+        );
     }
 
     @Override

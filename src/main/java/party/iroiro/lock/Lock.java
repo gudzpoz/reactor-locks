@@ -1,11 +1,13 @@
 package party.iroiro.lock;
 
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * A reactive interface for simple locks (and probably semaphores)
@@ -26,13 +28,18 @@ public interface Lock {
      * Tries to acquire the lock, or stop and propagate a {@link TimeoutException} downstream after
      * certain duration.
      *
+     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
+     *
      * @param duration the time to wait for lock
      * @return a {@link Mono} that emits success when the lock is acquired
      */
+    @Deprecated
     Mono<Void> tryLock(Duration duration);
 
     /**
      * Get a {@link Mono} that emits success only after acquiring the lock
+     *
+     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
      * Usage:
@@ -58,7 +65,21 @@ public interface Lock {
      *
      * @return a {@link Mono} that emits success when the lock is acquired
      */
+    @Deprecated
     Mono<Void> lock();
+
+    /**
+     * Automatically acquires the lock, executes the function and unlocks.
+     *
+     * <p>
+     * It handles all cases including when the {@link Flux} completes without error (empty or not),
+     * fails with errors, or gets cancelled middle way.
+     * </p>
+     *
+     * @param scoped a {@link Publisher} supplier to be run with the lock held
+     * @return a {@link Flux} containing values produces by the {@link Publisher} returned by the function
+     */
+    <T> Flux<T> withLock(Supplier<Publisher<T>> scoped);
 
     /**
      * Checks whether this lock is locked (or has reached the max lock holders)
@@ -73,6 +94,8 @@ public interface Lock {
 
     /**
      * Try to acquire the lock on the next element before propagating
+     *
+     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
      * Usage:
@@ -98,6 +121,7 @@ public interface Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> lockOnNext(Mono<T> mono);
 
     /**
@@ -123,6 +147,8 @@ public interface Lock {
     /**
      * Release the lock with {@link Mono#doOnTerminate(Runnable)} before propagating
      *
+     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
+     *
      * <p>
      * Usage:
      * </p>
@@ -145,10 +171,13 @@ public interface Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> unlockOnTerminate(Mono<T> mono);
 
     /**
      * Release the lock with {@link Mono#doOnNext(Consumer)} before propagating
+     *
+     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
      * Usage:
@@ -171,10 +200,13 @@ public interface Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> unlockOnNext(Mono<T> mono);
 
     /**
      * Release the lock with {@link Mono#switchIfEmpty(Mono)}
+     *
+     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
      * Usage:
@@ -197,10 +229,13 @@ public interface Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> unlockOnEmpty(Mono<T> mono);
 
     /**
      * Release the lock with {@link Mono#doOnError(Consumer)} before propagating
+     *
+     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
      *
      * <p>
      * Usage:
@@ -223,5 +258,6 @@ public interface Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> unlockOnError(Mono<T> mono);
 }

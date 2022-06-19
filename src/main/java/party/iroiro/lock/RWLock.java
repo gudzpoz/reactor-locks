@@ -1,10 +1,12 @@
 package party.iroiro.lock;
 
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 /**
  * An reactive interface for <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">
@@ -26,13 +28,26 @@ public interface RWLock extends Lock {
      * Tries to acquire the reader-lock, or stop and propagate a {@link TimeoutException}
      * downstream after certain duration.
      *
+     * @deprecated Use {@link #withLock(Supplier)} to handle cancelling signals
+     *
      * @param duration the time to wait for lock
      * @return a {@link Mono} that emits success when the lock is acquired
      */
+    @Deprecated
     Mono<Void> tryRLock(Duration duration);
 
     /**
+     * The reader lock version of {@link #withLock(Supplier)}.
+     *
+     * @param scoped the function to get executed with the lock held
+     * @return a {@link Flux} containing values produces by the {@link Publisher} returned by the function
+     */
+    <T> Flux<T> withRLock(Supplier<Publisher<T>> scoped);
+
+    /**
      * See {@link AbstractLock#lock} for details.
+     *
+     * @deprecated Use {@link #withRLock(Supplier)} to handle cancelling signals
      *
      * <p>
      * The difference is that the underlying implementation might choose to implement a
@@ -46,6 +61,7 @@ public interface RWLock extends Lock {
      *
      * @return a {@link Mono} that emits success when the lock is acquired
      */
+    @Deprecated
     Mono<Void> rLock();
 
     /**
@@ -62,6 +78,8 @@ public interface RWLock extends Lock {
     /**
      * See {@link AbstractLock#lockOnNext(Mono)} for details.
      *
+     * @deprecated Use {@link #withRLock(Supplier)} to handle cancelling signals
+     *
      * <p>
      * The difference is that the underlying implementation might choose to implement a
      * <a href="https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock">Readers–writer lock</a>.
@@ -71,6 +89,7 @@ public interface RWLock extends Lock {
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> rLockOnNext(Mono<T> mono);
 
     /**
@@ -81,36 +100,48 @@ public interface RWLock extends Lock {
     /**
      * See {@link AbstractLock#unlockOnEmpty(Mono)} for details.
      *
+     * @deprecated Use {@link #withRLock(Supplier)} to handle cancelling signals
+     *
      * @param mono the {@link Mono}, of which the next signal, when Mono is empty, will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> rUnlockOnEmpty(Mono<T> mono);
 
     /**
      * See {@link AbstractLock#unlockOnNext(Mono)} for details.
      *
+     * @deprecated Use {@link #withRLock(Supplier)} to handle cancelling signals
+     *
      * @param mono the {@link Mono}, of which the next value will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> rUnlockOnNext(Mono<T> mono);
 
     /**
      * See {@link AbstractLock#unlockOnTerminate(Mono)} for details.
      *
+     * @deprecated Use {@link #withRLock(Supplier)} to handle cancelling signals
+     *
      * @param mono the {@link Mono}, of which the termination signal will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> rUnlockOnTerminate(Mono<T> mono);
 
     /**
      * See {@link AbstractLock#unlockOnError(Mono)} for details.
      *
+     * @deprecated Use {@link #withRLock(Supplier)} to handle cancelling signals
+     *
      * @param mono the {@link Mono}, of which the next error will require unlocking to propagate
      * @param <T>  the generic type of {@link Mono}
      * @return the transformed {@link Mono}
      */
+    @Deprecated
     <T> Mono<T> rUnlockOnError(Mono<T> mono);
 }
