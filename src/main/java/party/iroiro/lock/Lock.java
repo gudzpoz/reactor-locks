@@ -16,6 +16,17 @@ import java.util.function.Supplier;
  */
 public interface Lock {
     /**
+     * Transforming a {@link Mono} into {@link LockedMono.LockedMonoBuilder} for uses with its fluent API
+     *
+     * @param mono the {@link Mono} to get transformed
+     * @return a {@link LockedMono.LockedMonoBuilder}
+     * @param <T> the input mono data type
+     */
+    static <T> LockedMono<T>.LockedMonoBuilder<T> begin(Mono<T> mono) {
+        return new LockedMono<>(mono).begin();
+    }
+
+    /**
      * Immediately requests to hold the lock.
      *
      * <p>
