@@ -16,10 +16,10 @@
 
 package party.iroiro.lock;
 
-class SomeException extends Exception {
+public class SomeException extends Exception {
     private final int i;
 
-    SomeException(int i) {
+    public SomeException(int i) {
         this.i = i;
     }
 

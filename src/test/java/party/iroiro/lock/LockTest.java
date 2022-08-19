@@ -19,6 +19,7 @@ package party.iroiro.lock;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.commons.annotation.Testable;
+import reactor.blockhound.BlockHound;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -79,6 +80,38 @@ public class LockTest {
         assertFalse(lock.isLocked());
     }
 
+    @RepeatedTest(value = 1000)
+    public void casRaceTest() {
+        // passed
+        Lock lock = new CasLock();
+        ArrayList<Mono<Integer>> monos = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) {
+            monos.add(lock.tryLock(Duration.ofNanos(10000))
+                    .thenReturn(0)
+                    .delayElement(Duration.ofNanos(10000))
+                    .transform(lock::unlockOnNext)
+                    .onErrorResume(TimeoutException.class, e -> Mono.just(-1)));
+        }
+        Flux.merge(monos).count().block();
+        assertFalse(lock.isLocked());
+    }
+
+    @RepeatedTest(value = 1000)
+    public void fairCasRaceTest() {
+        // passed
+        Lock lock = new CasLock(true);
+        ArrayList<Mono<Integer>> monos = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) {
+            monos.add(lock.tryLock(Duration.ofNanos(10000))
+                    .thenReturn(0)
+                    .delayElement(Duration.ofNanos(10000))
+                    .transform(lock::unlockOnNext)
+                    .onErrorResume(TimeoutException.class, e -> Mono.just(-1)));
+        }
+        Flux.merge(monos).count().block();
+        assertFalse(lock.isLocked());
+    }
+
     @Test
     public void sinkTest() {
         Sinks.Empty<Void> emitsBefore = Sinks.empty();
@@ -111,6 +144,20 @@ public class LockTest {
     }
 
     @RepeatedTest(value = 1000)
+    public void casLockTestHundredConcurrency() {
+        // passed
+        lockTest(new CasLock(), 100, 0, null);
+        lockTest(new CasLock(), 100, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 1000)
+    public void fairCasLockTestHundredConcurrency() {
+        // passed
+        lockTest(new CasLock(true), 100, 0, null);
+        lockTest(new CasLock(true), 100, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 1000)
     public void rwLockTestHundredConcurrency() {
         lockTest(new ReactiveRWLock(), 100, 0, null);
         lockTest(new ReactiveRWLock(), 100, 0, Schedulers.parallel());
@@ -120,6 +167,18 @@ public class LockTest {
     public void broadcastingLockTestHundredConcurrency() {
         lockTest(new BroadcastingLock(), 100, 0, null);
         lockTest(new BroadcastingLock(), 100, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 3000)
+    public void casLockTestPairConcurrency() {
+        lockTest(new CasLock(), 2, 0, null);
+        lockTest(new CasLock(), 2, 1, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 3000)
+    public void fairCasLockTestPairConcurrency() {
+        lockTest(new CasLock(true), 2, 0, null);
+        lockTest(new CasLock(true), 2, 1, Schedulers.parallel());
     }
 
     @RepeatedTest(value = 3000)
@@ -146,6 +205,16 @@ public class LockTest {
     }
 
     @RepeatedTest(value = 1000)
+    public void largeAudienceCasTest() {
+        lockTest(new CasLock(), 500, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 1000)
+    public void largeAudienceFairCasTest() {
+        lockTest(new CasLock(true), 500, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 1000)
     public void largeAudienceRwTest() {
         lockTest(new ReactiveRWLock(), 500, 0, Schedulers.parallel());
     }
@@ -158,6 +227,16 @@ public class LockTest {
     @RepeatedTest(value = 100)
     public void timeoutTest() {
         lockTest(new ReactiveLock(), 50, 10, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 100)
+    public void timeoutCasTest() {
+        lockTest(new CasLock(), 50, 10, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 100)
+    public void timeoutFairCasTest() {
+        lockTest(new CasLock(true), 50, 10, Schedulers.parallel());
     }
 
     @RepeatedTest(value = 100)

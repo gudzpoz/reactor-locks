@@ -9,19 +9,7 @@ import java.util.function.Supplier;
  */
 public interface LockHandle {
     static LockHandle empty() {
-        return new LockHandle() {
-            final Mono<Void> empty = Mono.empty();
-
-            @Override
-            public boolean cancel() {
-                return false;
-            }
-
-            @Override
-            public Mono<Void> mono() {
-                return empty;
-            }
-        };
+        return EmptyLockHandle.instance();
     }
 
     static LockHandle from(Mono<Void> mono, Supplier<Boolean> canceller) {
