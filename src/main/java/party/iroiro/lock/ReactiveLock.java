@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
  * A lock implementation using mainly CAS operations to synchronize
  *
  * <p>
- * It is modified from {_link CasSemaphore}, optimizing away the intermediate WIP variable.
+ * It is modified from {@link ReactiveSemaphore}, optimizing away the intermediate WIP variable.
  * </p>
  */
 public final class ReactiveLock extends AbstractLock {
