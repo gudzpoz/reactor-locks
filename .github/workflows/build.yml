@@ -2,8 +2,7 @@ name: Build and Publish
 
 on:
   workflow_dispatch:
-    branches:
-      - '*'
+    branches: [ release ]
 
 jobs:
   build-and-publish:
@@ -34,7 +33,6 @@ jobs:
         with:
           arguments: build
       - name: Gradle publish
-        if: github.ref == 'refs/heads/release'
         uses: gradle/gradle-build-action@v2
         env:
           GITHUB_ACTOR: ${{ github.actor }}
