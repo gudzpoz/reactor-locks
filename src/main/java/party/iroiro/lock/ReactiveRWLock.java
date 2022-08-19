@@ -20,7 +20,7 @@ import party.iroiro.lock.util.SinkUtils;
 import reactor.core.publisher.Sinks;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 /**
  * An implementation {@link RWLock}. See the Javadoc of {@link Lock} and {@link RWLock} for details.
@@ -29,174 +29,152 @@ import java.util.concurrent.locks.ReentrantLock;
  * This implementation handles writer hunger. A waiting writer should block (in reactive
  * ways, of course) further readers from acquiring the lock.
  * </p>
+ * <p>
+ * Implemented with CAS operations (i.e., non-blocking).
+ * </p>
  */
-public class ReactiveRWLock extends AbstractRWLock {
-    private final ConcurrentLinkedQueue<Sinks.Empty<Void>> readers;
-    private final ConcurrentLinkedQueue<Sinks.Empty<Void>> writers;
-    private final ReentrantLock lock;
-    private int readerCount;
-    private boolean readingStarting;
-    private State state;
+public final class ReactiveRWLock extends AbstractRWLock {
+    /**
+     * A state variable
+     *
+     * <ul>
+     *     <li>{@code r == 0}: Unlocked.</li>
+     *     <li>{@code r >= 1}: Locked by readers with no pending writers.</li>
+     *     <li>{@code r == Integer.MIN_VALUE}: Never. Semantically, to-be-writer-unlocked or a negative zero.</li>
+     *     <li>{@code 0 > r > Integer.MIN_VALUE}:
+     *     <ul>
+     *         <li>Either locked by readers, but there are pending writers.</li>
+     *         <li>Or locked by a writer.</li>
+     *     </ul>
+     *     </li>
+     * </ul>
+     */
+    private volatile int r = 0;
+    private final static AtomicIntegerFieldUpdater<ReactiveRWLock> R =
+            AtomicIntegerFieldUpdater.newUpdater(ReactiveRWLock.class, "r");
 
-    public ReactiveRWLock() {
-        state = State.NONE;
-        readerCount = 0;
-        readingStarting = false;
-        readers = new ConcurrentLinkedQueue<>();
-        writers = new ConcurrentLinkedQueue<>();
-        lock = new ReentrantLock();
-    }
+    private volatile int wip = 0;
+    private final static AtomicIntegerFieldUpdater<ReactiveRWLock> WIP =
+            AtomicIntegerFieldUpdater.newUpdater(ReactiveRWLock.class, "wip");
+
+    private final ConcurrentLinkedQueue<Sinks.Empty<Void>> readers = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<Sinks.Empty<Void>> writers = new ConcurrentLinkedQueue<>();
 
     @Override
     public LockHandle tryLock() {
-        lock.lock();
-        if (state == State.NONE) {
-            state = State.WRITING;
-            lock.unlock();
+        if (R.compareAndSet(this, 0, Integer.MIN_VALUE + 1)) {
+            /* Atomically acquires the lock */
             return LockHandle.empty();
         } else {
-            LockHandle entry = SinkUtils.queue(writers, empty -> empty.tryEmitEmpty().isSuccess());
-            lock.unlock();
-            return entry;
-        }
-    }
-
-    @Override
-    public boolean isLocked() {
-        lock.lock();
-        boolean state = this.state != State.NONE;
-        lock.unlock();
-        return state;
-    }
-
-    public void unlock() {
-        Sinks.Empty<Void> sink;
-        while (true) {
-            lock.lock();
-
-            sink = writers.poll();
-            if (sink == null) {
-                if (readers.isEmpty()) {
-                    state = State.NONE;
-                } else {
-                    startReaders();
-                }
-                lock.unlock();
-                return;
-            }
-
-            lock.unlock();
-
-            if (sink.tryEmitEmpty().isSuccess()) {
-                return;
-            }
-        }
-    }
-
-    /**
-     * One should lock {@link #lock} before calling this method
-     *
-     * <p>
-     * Does not unlock the {@link #lock}.
-     * </p>
-     */
-    private void startReaders() {
-        readingStarting = true;
-        state = State.READING;
-
-        Sinks.Empty<Void> reader;
-        while (true) {
-            reader = readers.poll();
-            if (reader == null) {
-                readingStarting = false;
-                if (readerCount == 0) {
-                    if (writers.isEmpty()) {
-                        state = State.NONE;
-                    } else {
-                        /*
-                         * May cause StackOverflowError in really unlucky conditions
-                         * Hopefully the recursion is not that deep
-                         */
-                        state = State.WRITING;
-                        lock.unlock();
-                        unlock();
-                        lock.lock();
-                    }
-                }
-                return;
-            }
-
-            readerCount++;
-
-            lock.unlock();
-            boolean success = reader.tryEmitEmpty().isSuccess();
-            lock.lock();
-            if (!success) {
-                readerCount--;
-            }
+            LockHandle handle = SinkUtils.queue(writers, SinkUtils::emitEmpty);
+            /* Conceptually does a lock upgrade (reader to writer) */
+            R.updateAndGet(this, i -> i >= 0 ? i + Integer.MIN_VALUE + 1 : i + 1);
+            /* Ensures that trailing requests are processed */
+            decrement();
+            return handle;
         }
     }
 
     @Override
     public LockHandle tryRLock() {
-        lock.lock();
-        switch (state) {
-            case NONE:
-                state = State.READING;
-                readerCount++;
-                lock.unlock();
-                return LockHandle.empty();
-            case READING:
-                if (writers.isEmpty() && !readingStarting) {
-                    readerCount++;
-                    lock.unlock();
-                    return LockHandle.empty();
-                }
-                /* Fall through */
-            case WRITING:
-                /* default: For full coverage */
-            default:
-                LockHandle entry = SinkUtils.queue(readers, empty -> {
-                    lock.lock();
-                    readerCount++;
-                    lock.unlock();
-                    if (empty.tryEmitEmpty().isSuccess()) {
-                        rUnlock();
-                        return true;
+        /* Atomically checks if it is already reading */
+        if (R.incrementAndGet(this) > 0) {
+            /* Acquires the lock */
+            return LockHandle.empty();
+        } else {
+            /*
+             * Writing or writer pending: Signals to the current writer
+             */
+            LockHandle handle = SinkUtils.queue(readers, SinkUtils::emitEmpty);
+            decrement();
+            return handle;
+        }
+    }
+
+    private void decrement() {
+        /*
+         * We introduced an intermediate WIP to decrement COUNT,
+         * which ensures that all decrement requests get processed correctly.
+         */
+        if (WIP.incrementAndGet(this) == 1) {
+            /*
+             * Only one thread will be doing the decrementing job to avoid concurrent decrements.
+             *
+             * If there are pending requests, concurrent decrements might eventually result in
+             * a corrupted R state.
+             */
+            do {
+                if (r != Integer.MIN_VALUE + 1) {
+                    /* Most commonly so */
+                    R.decrementAndGet(this);
+                } else {
+                    /*
+                     * Must be a writer / the last reader unlocking.
+                     *
+                     * Tries to emit to a writer first
+                     */
+                    if (SinkUtils.emitAny(writers)) {
+                        //noinspection UnnecessaryContinue
+                        continue;
+                        /*
+                         * Decrements WIP, without decrementing R
+                         */
                     } else {
-                        rUnlock();
-                        return false;
+                        /*
+                         * Tries to emit to readers
+                         */
+                        if (R.compareAndSet(this, Integer.MIN_VALUE + 1, 1)) {
+                            /*
+                             * The above updateAndGet sets R to 1 rather than 0:
+                             * - We perform the following as a pseudo-reader.
+                             * - Alternatively, we interpret this as a lock downgrade (writer -> reader).
+                             */
+                            do {
+                                R.incrementAndGet(this);
+                            } while (SinkUtils.emitAny(readers));
+
+                            /*
+                             * The above for-while loop induces an extra increment in R,
+                             * we increment WIP instead of decrementing R
+                             * to ensure that the lock is correctly unlocked or passed to a writer.
+                             */
+                            WIP.incrementAndGet(this);
+
+                            /*
+                             * The pseudo reader unlocks.
+                             */
+                            R.decrementAndGet(this);
+                        } else {
+                            /*
+                             * Some reader / writer just incremented R:
+                             * - Let's process their requests before switching to a reader lock.
+                             * - It is because we need to ensure R < 0 when any writer is pending.
+                             */
+                            R.decrementAndGet(this);
+                        }
                     }
-                });
-                lock.unlock();
-                return entry;
+                }
+            } while (WIP.decrementAndGet(this) != 0);
         }
     }
 
     @Override
-    public boolean isRLocked() {
-        lock.lock();
-        boolean state = this.state == State.READING;
-        lock.unlock();
-        return state;
+    public void unlock() {
+        decrement();
     }
 
     @Override
     public void rUnlock() {
-        lock.lock();
-        readerCount--;
-        if (readerCount == 0 && state == State.READING) {
-            if (!readingStarting) {
-                state = State.WRITING;
-                lock.unlock();
-                unlock();
-                return;
-            }
-        }
-        lock.unlock();
+        decrement();
     }
 
-    private enum State {
-        READING, WRITING, NONE,
+    @Override
+    public boolean isLocked() {
+        return r != 0;
+    }
+
+    @Override
+    public boolean isRLocked() {
+        return r > 0;
     }
 }
