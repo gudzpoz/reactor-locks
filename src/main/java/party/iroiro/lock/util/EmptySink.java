@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package party.iroiro.lock.util;
 
 import org.reactivestreams.Publisher;
@@ -5,10 +21,10 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import party.iroiro.lock.LockHandle;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Operators;
 import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.IntUnaryOperator;
@@ -44,8 +60,7 @@ public class EmptySink implements Publisher<Void>, LockHandle {
     private final static int REQUESTED  = 0b00001000;
     // @formatter:on
 
-    @SuppressWarnings({"rawtypes"})
-    private volatile Subscriber subscriber = null;
+    private volatile Subscriber<? super Void> subscriber = null;
     @SuppressWarnings("rawtypes")
     private static final AtomicReferenceFieldUpdater<EmptySink, Subscriber> SUBSCRIBER =
             AtomicReferenceFieldUpdater.newUpdater(EmptySink.class, Subscriber.class, "subscriber");
@@ -87,21 +102,7 @@ public class EmptySink implements Publisher<Void>, LockHandle {
                 }
             });
         } else {
-            s.onSubscribe(new Subscription() {
-                private final AtomicBoolean stop = new AtomicBoolean(false);
-
-                @Override
-                public void request(long n) {
-                    if (stop.compareAndSet(false, true)) {
-                        s.onError(new IllegalAccessException("Multiple subscription disallowed"));
-                    }
-                }
-
-                @Override
-                public void cancel() {
-                    stop.set(true);
-                }
-            });
+            Operators.error(s, new IllegalAccessException("Multiple subscription disallowed"));
         }
     }
 
