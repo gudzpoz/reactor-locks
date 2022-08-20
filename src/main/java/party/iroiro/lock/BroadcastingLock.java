@@ -47,21 +47,19 @@ public class BroadcastingLock extends AbstractLock {
     public LockHandle tryLock() {
         final AtomicBoolean lockedByMe = new AtomicBoolean(false);
         Mono<Void> request = queue.filter(ignored -> {
-            synchronized (lockedByMe) {
-                if (lockedByMe.get()) {
-                    /* Race condition: Cancelled */
-                    return false;
+            if (unlocked.compareAndSet(true, false)) {
+                if (lockedByMe.compareAndSet(false, true)) {
+                    return true;
                 } else {
-                    lockedByMe.set(unlocked.getAndSet(false));
-                    return lockedByMe.get();
+                    /* Race condition: Cancelled */
+                    unlock();
+                    return false;
                 }
+            } else {
+                return false;
             }
         }).next().then();
-        return LockHandle.from(request, () -> {
-            synchronized (lockedByMe) {
-                return !lockedByMe.getAndSet(true);
-            }
-        });
+        return LockHandle.from(request, () -> lockedByMe.compareAndSet(false, true));
     }
 
     @Override

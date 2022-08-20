@@ -2,7 +2,7 @@ name: Test Coverage
 
 on:
   workflow_dispatch:
-    branches: [ main ]
+    branches: [ '*' ]
   push:
     branches: [ main ]
 

@@ -25,7 +25,6 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.annotation.Nullable;
 
-import java.lang.reflect.Field;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
@@ -39,25 +38,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Testable
 public class RWLockTest {
-    @Test
-    public void unlockCoverageTest() {
-        ReactiveRWLock lock = new ReactiveRWLock();
-        reflectiveSet(lock, "state", null);
-        assertThrows(NullPointerException.class, () -> lock.rLock().block());
-    }
-
-    @SuppressWarnings("SameParameterValue")
-    private void reflectiveSet(Object obj, String name, @Nullable Object value) {
-        try {
-            System.out.println(obj.getClass().getName());
-            Field field = obj.getClass().getDeclaredField(name);
-            field.setAccessible(true);
-            field.set(obj, value);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            e.printStackTrace();
-        }
-    }
-
     @RepeatedTest(value = 20000)
     public void rwLockTest() {
         rwLockTest(2, 0, null);
@@ -154,7 +134,7 @@ public class RWLockTest {
             if (isReader(i)) {
                 readers.incrementAndGet();
                 assertFalse(writing.get());
-                assertTrue(lock.isRLocked());
+                assertTrue(lock.isRLocked() || lock.isLocked());
             } else {
                 assertTrue(lock.isLocked());
                 assertFalse(lock.isRLocked());

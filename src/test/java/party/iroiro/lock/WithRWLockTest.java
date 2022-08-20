@@ -46,10 +46,10 @@ public class WithRWLockTest {
         return lock.withRLock(() -> Mono.just(j)
                 .delayElement(delay)
                 .flatMap(k -> {
-                    if (!lock.isLocked() || !lock.isRLocked()) {
-                        return Mono.error(new RuntimeException("Unlocked?"));
-                    } else {
+                    if (lock.isLocked() || lock.isRLocked()) {
                         return Mono.just(k);
+                    } else {
+                        return Mono.error(new RuntimeException("Unlocked?"));
                     }
                 })
         ).singleOrEmpty();

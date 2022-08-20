@@ -17,6 +17,7 @@
 package party.iroiro.lock;
 
 import org.reactivestreams.Publisher;
+import party.iroiro.lock.util.LockCancellationException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -45,7 +46,7 @@ abstract class AbstractRWLock extends AbstractLock implements RWLock {
                 this::tryRLock,
                 lockHandle -> lockHandle.mono().thenMany(Flux.defer(scoped)),
                 lockHandle -> { if (!lockHandle.cancel()) { rUnlock(); } }
-        );
+        ).onErrorResume(LockCancellationException.class, e -> Mono.empty());
     }
 
     @Override

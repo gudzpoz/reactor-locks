@@ -38,7 +38,7 @@ class Example {
 <dependency>
   <groupId>party.iroiro</groupId>
   <artifactId>reactor-locks</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
 </dependency>
 ```
 
@@ -48,7 +48,7 @@ class Example {
 <summary>Gradle</summary>
 
 ```groovy
-implementation 'party.iroiro:reactor-locks:1.0.0'
+implementation 'party.iroiro:reactor-locks:1.1.0'
 ```
 
 </details>
@@ -135,23 +135,25 @@ Whether the lock has been (either reader- or writer-) locked. For semaphores, it
 
 ### Wrapped Operators
 
-In previous version of this library, we have `lockOnNext` `unlockOnNext` to make locking easier. However, all these operators does not handle Mono cancellations (from downstream `timeout` for example) and we are deprecating them.
+In previous versions of this library, we have `lockOnNext` `unlockOnNext` to make locking easier. However, all these operators does not handle Mono cancellations (from downstream `timeout` for example) and we are deprecating them.
 
 Use the fluent API or `withLock` / `withRLock` instead.
 
 ## Locks
 
+All the lock implementations use CAS operations and are non-blocking.
+
 ### Lock Implementations
 
 - `ReactiveLock`
-  
+
   A basic lock. Internally using a queue.
-  
+
 - `BroadcastingLock`
 
   Functionally equivalent to `ReactiveLock`. Internally using a broadcast, which might degrade performance in *really extreme* cases.
 
-- `Semaphore`
+- `ReactiveSemaphore`
 
   A lock allowing multiple lock holders.
 

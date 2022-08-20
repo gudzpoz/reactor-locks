@@ -35,6 +35,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class SemaphoreTest {
     @Test
+    public void negativeLimitTest() {
+        assertThrows(IllegalArgumentException.class, () -> new ReactiveSemaphore(-1));
+        assertThrows(IllegalArgumentException.class, () -> new ReactiveSemaphore(0));
+    }
+
+    @Test
     public void lockedTest() {
         ReactiveSemaphore semaphore = new ReactiveSemaphore(2);
         semaphore.lock().block();

@@ -17,6 +17,7 @@
 package party.iroiro.lock;
 
 import org.reactivestreams.Publisher;
+import party.iroiro.lock.util.LockCancellationException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -49,7 +50,7 @@ abstract class AbstractLock implements Lock {
                 this::tryLock,
                 lockHandle -> lockHandle.mono().thenMany(Flux.defer(scoped)),
                 lockHandle -> { if (!lockHandle.cancel()) { unlock(); } }
-        );
+        ).onErrorResume(LockCancellationException.class, e -> Mono.empty());
     }
 
     @Override

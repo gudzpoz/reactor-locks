@@ -4,10 +4,11 @@ plugins {
     id 'maven-publish'
     id 'signing'
     id 'jacoco'
+    id 'me.champeau.jmh' version '0.6.6'
 }
 
 group 'party.iroiro'
-version '1.0.0'
+version '1.1.0-SNAPSHOT'
 
 sourceCompatibility = '1.8'
 targetCompatibility = '1.8'
@@ -16,11 +17,17 @@ repositories {
     mavenCentral()
 }
 
+ext {
+    jmhVersion = '1.35'
+}
+
 dependencies {
-    api 'io.projectreactor:reactor-core:3.4.18'
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
-    implementation 'io.projectreactor:reactor-test:3.4.18'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.2'
+    api 'io.projectreactor:reactor-core:3.4.21'
+    testImplementation 'io.projectreactor:reactor-test:3.4.21'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.0'
+    jmh "org.openjdk.jmh:jmh-core:$jmhVersion"
+    jmh "org.openjdk.jmh:jmh-generator-annprocess:$jmhVersion"
 }
 
 test {
@@ -30,6 +37,13 @@ test {
 java {
     withSourcesJar()
     withJavadocJar()
+}
+
+jmh {
+    warmupIterations = 3
+    iterations = 3
+    fork = 1
+    threads = 4
 }
 
 apply from: 'jacoco.gradle'

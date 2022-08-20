@@ -79,6 +79,21 @@ public class LockTest {
         assertFalse(lock.isLocked());
     }
 
+    @RepeatedTest(value = 1000)
+    public void fairCasRaceTest() {
+        Lock lock = new ReactiveLock(true);
+        ArrayList<Mono<Integer>> monos = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) {
+            monos.add(lock.tryLock(Duration.ofNanos(10000))
+                    .thenReturn(0)
+                    .delayElement(Duration.ofNanos(10000))
+                    .transform(lock::unlockOnNext)
+                    .onErrorResume(TimeoutException.class, e -> Mono.just(-1)));
+        }
+        Flux.merge(monos).count().block();
+        assertFalse(lock.isLocked());
+    }
+
     @Test
     public void sinkTest() {
         Sinks.Empty<Void> emitsBefore = Sinks.empty();
@@ -111,6 +126,13 @@ public class LockTest {
     }
 
     @RepeatedTest(value = 1000)
+    public void fairCasLockTestHundredConcurrency() {
+        // passed
+        lockTest(new ReactiveLock(true), 100, 0, null);
+        lockTest(new ReactiveLock(true), 100, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 1000)
     public void rwLockTestHundredConcurrency() {
         lockTest(new ReactiveRWLock(), 100, 0, null);
         lockTest(new ReactiveRWLock(), 100, 0, Schedulers.parallel());
@@ -120,6 +142,12 @@ public class LockTest {
     public void broadcastingLockTestHundredConcurrency() {
         lockTest(new BroadcastingLock(), 100, 0, null);
         lockTest(new BroadcastingLock(), 100, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 3000)
+    public void fairCasLockTestPairConcurrency() {
+        lockTest(new ReactiveLock(true), 2, 0, null);
+        lockTest(new ReactiveLock(true), 2, 1, Schedulers.parallel());
     }
 
     @RepeatedTest(value = 3000)
@@ -146,6 +174,11 @@ public class LockTest {
     }
 
     @RepeatedTest(value = 1000)
+    public void largeAudienceFairCasTest() {
+        lockTest(new ReactiveLock(true), 500, 0, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 1000)
     public void largeAudienceRwTest() {
         lockTest(new ReactiveRWLock(), 500, 0, Schedulers.parallel());
     }
@@ -158,6 +191,11 @@ public class LockTest {
     @RepeatedTest(value = 100)
     public void timeoutTest() {
         lockTest(new ReactiveLock(), 50, 10, Schedulers.parallel());
+    }
+
+    @RepeatedTest(value = 100)
+    public void timeoutFairCasTest() {
+        lockTest(new ReactiveLock(true), 50, 10, Schedulers.parallel());
     }
 
     @RepeatedTest(value = 100)
