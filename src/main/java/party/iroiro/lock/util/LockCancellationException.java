@@ -23,6 +23,7 @@ public class LockCancellationException extends Exception {
     private final static LockCancellationException INSTANCE = new LockCancellationException();
 
     /**
+     * Returns a static instance of the exception
      * @return a static instance of the exception
      */
     public static LockCancellationException instance() {
