@@ -4,7 +4,7 @@ plugins {
     id 'maven-publish'
     id 'signing'
     id 'jacoco'
-    id 'me.champeau.jmh' version '0.6.6'
+    id 'me.champeau.jmh' version '0.6.7'
 }
 
 group 'party.iroiro'
