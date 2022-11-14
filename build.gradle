@@ -18,7 +18,7 @@ repositories {
 }
 
 ext {
-    jmhVersion = '1.35'
+    jmhVersion = '1.36'
 }
 
 dependencies {
